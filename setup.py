@@ -25,6 +25,8 @@ def import_module_from_path(path):
 util = import_module_from_path('optix/utility.py')
 cuda_include_path = util.get_cuda_include_path()
 optix_include_path = util.get_optix_include_path()
+if cuda_include_path is None or optix_include_path is None:
+    raise RuntimeError("Cuda or optix not found in the system")
 
 extensions = [Extension("*", ["optix/*.pyx"], include_dirs=[cuda_include_path, optix_include_path])]
 
