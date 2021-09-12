@@ -2,7 +2,7 @@ from setuptools import setup, Extension
 from Cython.Build import cythonize
 
 
-# standalone import of a module
+# standalone import of a module (https://stackoverflow.com/a/58423785)
 def import_module_from_path(path):
     """Import a module from the given path."""
     import importlib
@@ -27,7 +27,6 @@ cuda_include_path = util.get_cuda_include_path()
 optix_include_path = util.get_optix_include_path()
 
 extensions = [Extension("*", ["optix/*.pyx"], include_dirs=[cuda_include_path, optix_include_path])]
-#extensions = [Extension("*", [s], include_dirs=[cuda_include_path, optix_include_path]) for s in source_files]
 
 
 setup(
