@@ -37,7 +37,7 @@ setup(
     author_email="felix.igelbrink@uni-osnabrueck.de",
     name="python-optix",
     description="Python bindings to the optix raytracing framework by nvidia",
-    ext_modules=cythonize(extensions, language_level="3", annotate=True, nthreads=-1),
+    ext_modules=cythonize(extensions, language_level="3", annotate=False, nthreads=-1),
     install_requires=[
         'numpy>=1.21',
         'cupy>=9.4'
