@@ -1,0 +1,2 @@
+class OptixException(RuntimeError):
+    pass
