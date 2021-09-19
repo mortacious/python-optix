@@ -5,12 +5,22 @@ from .context cimport DeviceContext
 import cupy as cp
 import numpy as np
 from enum import IntEnum, IntFlag
-#from libc.stdlib cimport malloc, free
-from libc.string cimport memcpy
+from libc.string cimport memcpy, memset
 from libcpp.vector cimport vector
-
+from .common import round_up
 
 optix_init()
+
+__all__ = ['GeometryFlags',
+           'PrimitiveType',
+           'InstanceFlags',
+           'BuildInputTriangleArray',
+           'BuildInputCustomPrimitiveArray',
+           'BuildInputCurveArray',
+           'BuildInputInstanceArray',
+           'Instance',
+           'AccelerationStructure'
+           ]
 
 class GeometryFlags(IntEnum):
     NONE = OPTIX_GEOMETRY_FLAG_NONE,
@@ -164,7 +174,7 @@ cdef class BuildInputCustomPrimitiveArray(BuildInputArray):
                  primitive_index_offset = 0
                  ):
 
-        self._d_aabb_buffers = [cp.asarray(ab, dtype=np.float32) for ab in aabb_buffers]
+        self._d_aabb_buffers = [cp.asarray(ab, dtype=np.float32).reshape(-1, 6) for ab in aabb_buffers]
         self._d_aabb_buffer_ptrs.reserve(len(self._d_aabb_buffers))
 
         dtype = self._d_aabb_buffers[0].dtype
@@ -179,7 +189,7 @@ cdef class BuildInputCustomPrimitiveArray(BuildInputArray):
 
         self._build_input.aabbBuffers = self._d_aabb_buffer_ptrs.const_data()
         self._build_input.numPrimitives = shape[0]
-        self._build_input.strideInBytes = self._d_aabb_buffers[0].strides[0]
+        self._build_input.strideInBytes = 0#self._d_aabb_buffers[0].strides[0]
 
         self._flags.resize(num_sbt_records)
         if flags is None:
@@ -217,15 +227,6 @@ cdef class BuildInputCustomPrimitiveArray(BuildInputArray):
 
 
 cdef class BuildInputCurveArray(BuildInputArray):
-    cdef OptixBuildInputCurveArray _build_input
-    cdef list _d_vertex_buffers
-    cdef vector[CUdeviceptr] _d_vertex_buffer_ptrs
-    cdef list _d_width_buffers
-    cdef vector[CUdeviceptr] _d_width_buffer_ptrs
-    cdef list _d_normal_buffers
-    cdef vector[CUdeviceptr] _d_normal_buffer_ptrs
-    cdef object _d_index_buffer
-
     def __init__(self, curve_type, vertex_buffers, width_buffers, normal_buffers, index_buffer, flags=None, primitive_index_offset=0):
         self._d_vertex_buffers = [cp.asarray(vb, np.float32) for vb in vertex_buffers]
         self._d_vertex_buffer_ptrs.reserve(len(self._d_vertex_buffers))
@@ -278,7 +279,7 @@ cdef class BuildInputCurveArray(BuildInputArray):
         if flags is None:
             self._build_input.flag = OPTIX_GEOMETRY_FLAG_NONE
         else:
-            self._build_input.flag = flags.value
+            self._build_input.flag = flags.valuesbtIndexOffsetBuffer
 
         self._build_input.primitiveIndexOffset = primitive_index_offset
 
@@ -314,7 +315,8 @@ cdef class BuildInputInstanceArray(BuildInputArray):
         for inst in instances:
             c_instances.push_back(inst._instance)
 
-        cudaMemcpy(<void*>self._d_instances.ptr, c_instances.const_data(), size, cudaMemcpyHostToDevice)
+        cp.cuda.runtime.memcpy(self._d_instances.ptr, <size_t>c_instances.data(), size, cp.cuda.runtime.memcpyHostToDevice)
+        #cudaMemcpy(<void*>self._d_instances.ptr, c_instances.const_data(), size, cudaMemcpyHostToDevice)
         self._build_input.instances = self._d_instances.ptr
         self._build_input.numInstances = len(instances)
 
@@ -330,18 +332,18 @@ cdef class AccelerationStructure:
         self._build_flags = OPTIX_BUILD_FLAG_NONE
         if compact:
             self._build_flags |= OPTIX_BUILD_FLAG_ALLOW_COMPACTION
-        if allow_update:
-            self._build_flags |= OPTIX_BUILD_FLAG_ALLOW_UPDATE
-        if prefer_fast_build:
-            self._build_flags |= OPTIX_BUILD_FLAG_PREFER_FAST_BUILD
-            self._build_flags &= ~OPTIX_BUILD_FLAG_PREFER_FAST_TRACE
-        else:
-            self._build_flags |= OPTIX_BUILD_FLAG_PREFER_FAST_TRACE
-            self._build_flags &= ~OPTIX_BUILD_FLAG_PREFER_FAST_BUILD
-        if random_vertex_access:
-            self._build_flags |= OPTIX_BUILD_FLAG_ALLOW_RANDOM_VERTEX_ACCESS
-        if random_instance_access:
-            self._build_flags |= OPTIX_BUILD_FLAG_ALLOW_RANDOM_INSTANCE_ACCESS
+        # if allow_update:
+        #     self._build_flags |= OPTIX_BUILD_FLAG_ALLOW_UPDATE
+        # if prefer_fast_build:
+        #     self._build_flags |= OPTIX_BUILD_FLAG_PREFER_FAST_BUILD
+        #     self._build_flags &= ~OPTIX_BUILD_FLAG_PREFER_FAST_TRACE
+        # else:
+        #     self._build_flags |= OPTIX_BUILD_FLAG_PREFER_FAST_TRACE
+        #     self._build_flags &= ~OPTIX_BUILD_FLAG_PREFER_FAST_BUILD
+        # if random_vertex_access:
+        #     self._build_flags |= OPTIX_BUILD_FLAG_ALLOW_RANDOM_VERTEX_ACCESS
+        # if random_instance_access:
+        #     self._build_flags |= OPTIX_BUILD_FLAG_ALLOW_RANDOM_INSTANCE_ACCESS
 
         self._gas_buffer = None
         self.build(build_inputs)
@@ -359,22 +361,26 @@ cdef class AccelerationStructure:
         cdef size_t inputs_size = len(build_inputs)
         cdef vector[OptixBuildInput] inputs = vector[OptixBuildInput](inputs_size)
 
+        print("build inputs", build_inputs, inputs_size)
         cdef OptixAccelBuildOptions accel_option
+        memset(&accel_option, 0, sizeof(OptixAccelBuildOptions))
         accel_option.buildFlags = self._build_flags
         accel_option.operation = OPTIX_BUILD_OPERATION_BUILD
 
         for i, build_input in enumerate(build_inputs):
             (<BuildInputArray>build_input).prepare_build_input(&inputs[i])
 
+        print("inputs", hex(inputs[0].type), inputs[0].customPrimitiveArray.numPrimitives, inputs[0].customPrimitiveArray.flags[0])
         cdef vector[OptixAccelBuildOptions] accel_options = vector[OptixAccelBuildOptions](inputs_size)
         for i in range(inputs_size):
             accel_options[i] = accel_option
 
-        cdef OptixAccelBufferSizes gas_buffer_sizes
-        cdef OptixAccelEmitDesc compacted_size_property
+        cdef OptixAccelBufferSizes gas_buffer_sizes = []
+        cdef OptixAccelEmitDesc compacted_size_property = []
+
         cdef CUdeviceptr gas_buffer_ptr
         cdef CUdeviceptr tmp_gas_buffer_ptr
-        cdef unsigned int num_properties
+        cdef unsigned int num_properties = 0
 
         optix_check_return(optixAccelComputeMemoryUsage(self.context.device_context,
                                                         accel_options.data(),
@@ -382,36 +388,83 @@ cdef class AccelerationStructure:
                                                         inputs_size,
                                                         &gas_buffer_sizes))
 
-        d_tmp_gas_buffer = cp.cuda.alloc(gas_buffer_sizes.tempSizeInBytes)
-        self._gas_buffer = cp.cuda.alloc(gas_buffer_sizes.outputSizeInBytes)
+        print("memory sizes", gas_buffer_sizes.tempSizeInBytes, gas_buffer_sizes.outputSizeInBytes, gas_buffer_sizes.tempUpdateSizeInBytes)
 
+        d_tmp_gas_buffer = cp.cuda.alloc(gas_buffer_sizes.tempSizeInBytes * 2)
+        self._gas_buffer = cp.cuda.alloc(round_up(gas_buffer_sizes.outputSizeInBytes, 8) + 8)
 
+        d_compacted_size = None
+        cdef OptixAccelEmitDesc* property_ptr = NULL
 
         if self.compact:
+            print("compacting...")
             d_compacted_size = cp.zeros(1, dtype=np.uint64)
             compacted_size_property.result = d_compacted_size.data.ptr
             compacted_size_property.type = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE
+            num_properties = 1
+            property_ptr = &compacted_size_property
 
         #cdef const OptixAccelBuildOptions* build_options_ptr = (<vector[OptixAccelBuildOptions]>accel_options_vector).const_data()
         gas_buffer_ptr = self._gas_buffer.ptr
         tmp_gas_buffer_ptr = d_tmp_gas_buffer.ptr
-        num_properties = <unsigned int>self.compact
 
-        with nogil:
-            # build acceleration structure without the gil
-            optix_check_return(optixAccelBuild(self.context.device_context,
-                                              0,  # TODO use actual cuda stream
-                                              accel_options.data(),
-                                              inputs.data(),
-                                              inputs_size,
-                                              tmp_gas_buffer_ptr,
-                                              gas_buffer_sizes.tempSizeInBytes,
-                                              gas_buffer_ptr,
-                                              gas_buffer_sizes.outputSizeInBytes,
-                                              &self._handle,
-                                              &compacted_size_property,
-                                              num_properties))
+        stream = cp.cuda.Stream()
 
+        print("building acceleration structure")
+        #print("stream", stream.ptr)
+        print("accel options", accel_options[0].buildFlags, accel_options[0].operation,
+              accel_options[0].motionOptions.flags, accel_options[0].motionOptions.numKeys, accel_options[0].motionOptions.timeBegin, accel_options[0].motionOptions.timeEnd)
+
+        print("inputs",
+              hex(inputs[0].type),
+              <size_t>inputs[0].customPrimitiveArray.aabbBuffers,
+              inputs[0].customPrimitiveArray.numPrimitives,
+              inputs[0].customPrimitiveArray.strideInBytes,
+              <size_t>inputs[0].customPrimitiveArray.flags,
+              inputs[0].customPrimitiveArray.flags[0],
+              inputs[0].customPrimitiveArray.numSbtRecords,
+              inputs[0].customPrimitiveArray.sbtIndexOffsetBuffer,
+              inputs[0].customPrimitiveArray.sbtIndexOffsetSizeInBytes,
+              inputs[0].customPrimitiveArray.sbtIndexOffsetStrideInBytes,
+              inputs[0].customPrimitiveArray.primitiveIndexOffset)
+        print("inputs size", inputs_size)
+        print("temp Buffer", tmp_gas_buffer_ptr)
+        print("temp size", gas_buffer_sizes.tempSizeInBytes)
+        print("gas output buffer", gas_buffer_ptr)
+        print("output size", gas_buffer_sizes.outputSizeInBytes)
+        print("handle", self._handle)
+        print("property ptr", <size_t>property_ptr)
+        print("property type", compacted_size_property.result, compacted_size_property.type)
+        print("num properties", num_properties)
+        # print("building acceleration structure",
+        #       <size_t>accel_options.data(),
+        #       <size_t>inputs.data(),
+        #       inputs_size,
+        #       tmp_gas_buffer_ptr,
+        #       gas_buffer_sizes.tempSizeInBytes * 2,
+        #       gas_buffer_ptr,
+        #       gas_buffer_sizes.outputSizeInBytes,
+        #       self._handle,
+        #       <size_t>property_ptr,
+        #       compacted_size_property.result, compacted_size_property.type, num_properties)
+
+        cdef size_t c_stream = stream.ptr
+
+        # build acceleration structure without the gil
+        optix_check_return(optixAccelBuild(self.context.device_context,
+                                          <CUstream>c_stream,
+                                          accel_options.data(),
+                                          inputs.data(),
+                                          inputs_size,
+                                          tmp_gas_buffer_ptr,
+                                          gas_buffer_sizes.tempSizeInBytes,
+                                          gas_buffer_ptr,
+                                          gas_buffer_sizes.outputSizeInBytes,
+                                          &self._handle,
+                                          property_ptr,
+                                          num_properties))
+        stream.synchronize()
+        print("done")
         cdef size_t compacted_gas_size = 0
 
         if self.compact:

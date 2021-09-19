@@ -155,7 +155,7 @@ cdef extern from "optix.h" nogil:
         CUdeviceptr result
         OptixAccelPropertyType type
 
-    ctypedef CUstream
+    ctypedef size_t CUstream
 
     ctypedef unsigned long long OptixTraversableHandle
 
@@ -240,18 +240,19 @@ cdef extern from "optix.h" nogil:
                                            OptixTraversableHandle * traversableHandle
                                            )
 
-cdef extern from "cuda_runtime.h":
-    ctypedef enum cudaError_t:
-        pass
 
-    cdef enum cudaMemcpyKind:
-        cudaMemcpyHostToHost,
-        cudaMemcpyHostToDevice,
-        cudaMemcpyDeviceToHost,
-        cudaMemcpyDeviceToDevice,
-        cudaMemcpyDefault
-
-    cudaError_t cudaMemcpy( void* dst, const void* src, size_t count, cudaMemcpyKind kind )
+# cdef extern from "cuda_runtime.h":
+#     ctypedef enum cudaError_t:
+#         pass
+#
+#     cdef enum cudaMemcpyKind:
+#         cudaMemcpyHostToHost,
+#         cudaMemcpyHostToDevice,
+#         cudaMemcpyDeviceToHost,
+#         cudaMemcpyDeviceToDevice,
+#         cudaMemcpyDefault
+#
+#     cudaError_t cudaMemcpy( void* dst, const void* src, size_t count, cudaMemcpyKind kind )
 
 
 cdef class BuildInputArray:
@@ -276,6 +277,17 @@ cdef class BuildInputCustomPrimitiveArray(BuildInputArray):
     cdef object _d_sbt_offset_buffer
     cdef object _d_pre_transform
     cdef vector[unsigned int] _flags
+
+
+cdef class BuildInputCurveArray(BuildInputArray):
+    cdef OptixBuildInputCurveArray _build_input
+    cdef list _d_vertex_buffers
+    cdef vector[CUdeviceptr] _d_vertex_buffer_ptrs
+    cdef list _d_width_buffers
+    cdef vector[CUdeviceptr] _d_width_buffer_ptrs
+    cdef list _d_normal_buffers
+    cdef vector[CUdeviceptr] _d_normal_buffer_ptrs
+    cdef object _d_index_buffer
 
 
 cdef class Instance:

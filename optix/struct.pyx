@@ -3,9 +3,7 @@
 import numpy as np
 import ctypes
 import cupy as cp
-
-def round_up( val, mult_of ):
-    return val if val % mult_of == 0 else val + mult_of - val % mult_of
+from .common import round_up
 
 
 def  _aligned_itemsize( formats, alignment ):

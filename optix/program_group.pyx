@@ -3,6 +3,7 @@
 from .common cimport optix_check_return, optix_init
 from .context cimport DeviceContext
 from .module cimport Module
+from libc.string cimport memset
 
 optix_init()
 
@@ -30,7 +31,8 @@ cdef class ProgramGroup:
         cdef bytes tmp_entry_function_name_1
         cdef bytes tmp_entry_function_name_2
         cdef bytes tmp_entry_function_name_3
-        cdef OptixProgramGroupDesc desc = []
+        cdef OptixProgramGroupDesc desc
+        memset(&desc, 0, sizeof(desc))
         desc.flags = OPTIX_PROGRAM_GROUP_FLAGS_NONE
 
         if raygen_entry_function_name is not None:
@@ -91,11 +93,12 @@ cdef class ProgramGroup:
                 if hitgroup_module_IS is None:
                     raise ValueError("hitgroup IS entry function specified but no module given")
                 else:
-                    desc.hitgroup.moduleAH = hitgroup_module_IS._module
+                    desc.hitgroup.moduleIS = hitgroup_module_IS._module
                     tmp_entry_function_name_3 = hitgroup_entry_function_name_IS.encode('ascii')
                     desc.hitgroup.entryFunctionNameIS = tmp_entry_function_name_3
 
-        cdef OptixProgramGroupOptions options = [] # init to zero
+        cdef OptixProgramGroupOptions options # init to zero
+        memset(&options, 0, sizeof(options))
         optix_check_return(optixProgramGroupCreate(context.device_context, &desc, 1, &options, NULL, NULL, &self._program_group))
 
     def __dealloc__(self):
@@ -145,7 +148,6 @@ cdef class ProgramGroup:
                     module_CH = module
                     module_AH = module
                     module_IS = module
-
         return cls(context,
                    hitgroup_module_CH=module_CH,
                    hitgroup_entry_function_name_CH=entry_function_CH,

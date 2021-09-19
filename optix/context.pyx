@@ -6,14 +6,14 @@ import cupy as cp
 
 optix_init()
 
+#cdef void context_log_cb(unsigned int level, const char* tag, const char* message, void* cbdata) with gil:
+#    context_log_cb_impl(level, tag, message, cbdata)
+
 cdef void context_log_cb(unsigned int level, const char* tag, const char* message, void* cbdata) with gil:
     cdef object cb_object = <object>cbdata # cast the cbdata to a pyobject
-    cb_object(level, tag, message)
+    cb_object(level, tag.decode(), message.decode())
 
 
-#cdef void init_optix() with gil:#
-#
-#    optix_check_return(optixInit())
 
 
 cdef class DeviceContext:

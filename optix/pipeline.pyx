@@ -1,6 +1,7 @@
 # distutils: language = c++
 
 from .common cimport optix_check_return, optix_init
+from .common import ensure_iterable
 from .context cimport DeviceContext
 from .program_group cimport OptixProgramGroup, OptixProgramGroupOptions, optixProgramGroupCreate, OptixProgramGroupDesc
 from enum import IntEnum, IntFlag
@@ -9,6 +10,7 @@ from libc.stdlib cimport malloc, free
 from .struct cimport LaunchParamsRecord
 from .struct import LaunchParamsRecord
 from .shader_binding_table cimport ShaderBindingTable
+from cython.operator cimport dereference as deref
 import cupy as cp
 
 optix_init()
@@ -152,20 +154,24 @@ cdef class PipelineLinkOptions:
 ctypedef vector[unsigned int] uint_vector
 
 cdef class Pipeline:
-    def __init__(self, DeviceContext context, PipelineCompileOptions compile_options, PipelineLinkOptions link_options, list program_groups, max_traversable_graph_depth=1):
+    def __init__(self, DeviceContext context, PipelineCompileOptions compile_options, PipelineLinkOptions link_options, program_groups, max_traversable_graph_depth=1):
+        program_groups = ensure_iterable(program_groups)
+
         if not all(isinstance(p, ProgramGroup) for p in program_groups):
             raise TypeError("Only program groups")
         cdef unsigned int num_program_groups = len(program_groups)
         cdef vector[OptixProgramGroup] c_program_groups = vector[OptixProgramGroup](num_program_groups)
         cdef int i
         cdef OptixProgramGroupOptions options
+        cdef ProgramGroup grp
         for i in range(num_program_groups):
-            c_program_groups[i] = <OptixProgramGroup>(self._program_groups[i]._program_group)
+            grp = <ProgramGroup>program_groups[i]
+            c_program_groups[i] = grp._program_group
 
-
+        print("computing stack sizes")
         for i in range(len(program_groups)):
             optix_check_return(optixUtilAccumulateStackSizes(c_program_groups[i], &self._stack_sizes))
-
+        print("creating pipeline ...")
         optix_check_return(optixPipelineCreate(context.device_context,
                                                &compile_options._compile_options,
                                                &link_options._link_options,
@@ -275,7 +281,8 @@ cdef class Pipeline:
                     free(c_program_groups_closesthit[i])
 
     def __dealloc__(self):
-        optix_check_return(optixPipelineDestroy(self._pipeline))
+        if <size_t>self._pipeline != 0:
+            optix_check_return(optixPipelineDestroy(self._pipeline))
 
     @property
     def c_obj(self):
@@ -289,5 +296,5 @@ cdef class Pipeline:
 
         stream = cp.cuda.Stream()
         d_params = params.to_gpu(stream=stream)
-
-        optix_check_return(optixLaunch(self._pipeline, stream.ptr, d_params, params.itemsize, &sbt._shader_binding_table, c_dims[0], c_dims[1], c_dims[2]))
+        cdef size_t c_stream = stream.ptr
+        optix_check_return(optixLaunch(self._pipeline, <CUstream>c_stream, d_params, params.itemsize, &sbt._shader_binding_table, c_dims[0], c_dims[1], c_dims[2]))

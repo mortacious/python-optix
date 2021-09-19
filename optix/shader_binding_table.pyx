@@ -2,8 +2,11 @@
 
 from .struct cimport SbtRecord
 from .struct import SbtRecord, array_to_device_memory
+from .common cimport optix_init
 import cupy as cp
 import numpy as np
+
+optix_init()
 
 cdef class ShaderBindingTable:
     def __init__(self,

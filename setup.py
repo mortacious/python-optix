@@ -28,7 +28,7 @@ optix_include_path = util.get_optix_include_path()
 if cuda_include_path is None or optix_include_path is None:
     raise RuntimeError("Cuda or optix not found in the system")
 
-extensions = [Extension("*", ["optix/*.pyx"], include_dirs=[cuda_include_path, optix_include_path])]
+extensions = [Extension("*", ["optix/*.pyx"], include_dirs=[cuda_include_path, optix_include_path], extra_compile_args=['-O0'])]
 
 
 setup(
@@ -37,7 +37,7 @@ setup(
     author_email="felix.igelbrink@uni-osnabrueck.de",
     name="python-optix",
     description="Python bindings to the optix raytracing framework by nvidia",
-    ext_modules=cythonize(extensions, language_level="3", annotate=False, nthreads=-1),
+    ext_modules=cythonize(extensions, language_level="3", annotate=True),
     install_requires=[
         'numpy>=1.21',
         'cupy>=9.4'
