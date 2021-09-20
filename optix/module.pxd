@@ -70,3 +70,5 @@ cdef class ModuleCompileOptions:
 cdef class Module:
     cdef OptixModule _module
     cdef list _compile_flags
+
+    #cpdef size_t c_obj(self)

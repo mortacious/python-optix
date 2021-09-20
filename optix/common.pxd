@@ -1,3 +1,5 @@
+from libc.stdint cimport uintptr_t
+
 cdef extern from *:
     ctypedef void * CUcontext
 
@@ -8,11 +10,12 @@ cdef extern from "optix_includes.h" nogil:
 
     cdef OptixResult optixInit()
 
+
+    #ctypedef uintptr_t OptixModule
     ctypedef struct OptixModule:
         pass
-
     # declare this so the symbol is not removed
-    cdef struct OptixFunctionTable:
+    ctypedef struct OptixFunctionTable:
         pass
 
     cdef const char* optixGetErrorName(OptixResult result)

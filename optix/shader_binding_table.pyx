@@ -57,7 +57,7 @@ cdef class ShaderBindingTable:
     def _process_record(self, record, count, strides, stream=None):
         if isinstance(record, SbtRecord):
             record_buffer = record.to_gpu(stream=stream)
-            return record_buffer, record.size, record.itemsize
+            return record_buffer.data, record.size, record.itemsize
         elif isinstance(record, cp.cuda.MemoryPointer):
             if count <= 0 or strides <= 0:
                 raise ValueError("Got Memorypointer for record but strides and count are not defined")
@@ -70,7 +70,6 @@ cdef class ShaderBindingTable:
         else:
             raise ValueError(f"Unsupported record type '{type(record)}'")
 
-    @property
-    def c_obj(self):
+    cpdef size_t c_obj(self):
         return <size_t>&self._shader_binding_table
 

@@ -51,15 +51,19 @@ def create_pipeline(ctx, program_grps, pipeline_options):
 def create_sbt(program_grps, centers, radii):
     raygen_grp, miss_grp, hit_grp = program_grps
 
+    print("raygen record")
     raygen_sbt = ox.SbtRecord(raygen_grp)
+    print("miss record")
     miss_sbt = ox.SbtRecord(miss_grp)
 
+    print("hit record")
     hit_sbt = ox.SbtRecord(hit_grp, names=('centers', 'radii'), formats=('u8', 'u8'))
+    print("filling data")
 
     hit_sbt['centers'] = centers.data.ptr
     hit_sbt['radii'] = radii.data.ptr
-
-    sbt = ox.ShaderBindingTable(raygen_record=raygen_sbt, miss_records=[miss_sbt], hitgroup_records=[hit_sbt])
+    print("constructing sbt")
+    sbt = ox.ShaderBindingTable(raygen_record=raygen_sbt, miss_records=miss_sbt, hitgroup_records=hit_sbt)
 
     return sbt
 
@@ -76,7 +80,7 @@ def launch_pipeline(pipeline : ox.Pipeline, sbt, gas, centers, ray_direction):
     params['visible'] = visible.data.ptr
     params['ray_direction'] = ray_direction
     params['tolerance'] = 0.15
-    params['trav_handle'] = gas.c_obj
+    params['trav_handle'] = gas.c_obj()
 
     stream = cp.cuda.Stream()
 
@@ -89,7 +93,7 @@ def launch_pipeline(pipeline : ox.Pipeline, sbt, gas, centers, ray_direction):
 
 
 def log_callback(level, tag, msg):
-    #print("[{:>2}][{:>12}]: {}".format(level, tag, msg))
+    print("[{:>2}][{:>12}]: {}".format(level, tag, msg))
     pass
 
 

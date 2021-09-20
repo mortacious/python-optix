@@ -485,3 +485,6 @@ cdef class AccelerationStructure:
     def update(self, build_input):
         raise NotImplementedError()
 
+    cpdef size_t c_obj(self):
+        return <OptixTraversableHandle>self._handle
+

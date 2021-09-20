@@ -305,3 +305,4 @@ cdef class AccelerationStructure:
     cdef unsigned int _build_flags
     cdef object _gas_buffer
     cdef OptixTraversableHandle _handle
+    cpdef size_t c_obj(self)

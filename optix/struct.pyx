@@ -37,6 +37,7 @@ SBT_RECORD_HEADER_SIZE = OPTIX_SBT_RECORD_HEADER_SIZE
 cdef class _StructHelper(object):
     def __init__(self, names=(), formats=(), size=1, alignment=1):
         self.array_values = {} # init dict
+        print("converting dtype")
         self.dtype = self._convert_to_aligned_dtype(names, formats, alignment)
         self._array = self._create(size)
 
@@ -67,13 +68,14 @@ cdef class _StructHelper(object):
 
         """
         itemsize = _aligned_itemsize(formats, alignment)
-
+        print(itemsize)
         dtype = np.dtype({
             'names': names,
             'formats': formats,
             'itemsize': itemsize,
             'align': True
         })
+        print("dtype", dtype)
 
         return dtype
 
@@ -117,21 +119,27 @@ cdef class SbtRecord(_StructHelper):
         header_format = '{}B'.format(OPTIX_SBT_RECORD_HEADER_SIZE)
         names = ('header',) + names
         formats = (header_format,) + formats
+        print("super init")
         super().__init__(names, formats, size=size, alignment=OPTIX_SBT_RECORD_ALIGNMENT)
+        print("super done")
 
     def _prepare_array(self, array):
+        print("preparing", array)
         cdef size_t itemsize = self.dtype.itemsize
         # view the array as bytes
         #view = array.view('B').reshape(-1, itemsize)
         cdef size_t i
         cdef size_t size = array.shape[0]
-        cdef unsigned char* buffer =  <unsigned char*>array.data
+        #cdef unsigned char* buffer = <unsigned char*>array.data.data
+        cdef unsigned char[:, ::1] buffer =  array.view('B').reshape(-1, itemsize)
         #cdef char[:, :, ::1] c_view = view
-
-        # fill each entry with the header
+        print("buffer", buffer[0, itemsize-3], <size_t>&buffer[0,0])
+        print("size", size)# fill each entry with the header
         # TODO make sure this loop is all in C
-        for i in range(size):
-            optixSbtRecordPackHeader(self.program_group._program_group, buffer + i * itemsize)
+        #for i in range(size):
+            #print("packing header")
+            #print(<size_t>(&buffer[0, 0]),<size_t>(&buffer[0, 0] + i * itemsize), i, itemsize)
+        #    optixSbtRecordPackHeader(self.program_group._program_group, <void*>(&buffer[0, 0]))
         return array
 
 

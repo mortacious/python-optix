@@ -91,13 +91,13 @@ cdef class Module:
             ptx = src
         cdef const char* c_ptx = ptx
         optixModuleCreateFromPTX(context.device_context,
-                                                    &(module_compile_options._compile_options),
-                                                    &(pipeline_compile_options._compile_options),
-                                                    c_ptx,
-                                                    len(ptx)+1,
-                                                    NULL,
-                                                    NULL,
-                                                    &self._module)
+                                 &(module_compile_options._compile_options),
+                                 &(pipeline_compile_options._compile_options),
+                                 c_ptx,
+                                 len(ptx)+1,
+                                 NULL,
+                                 NULL,
+                                 &self._module)
 
     def _compile_cuda_ptx(self, src, name=None, **kwargs):
         if os.path.exists(src):
@@ -109,10 +109,11 @@ cdef class Module:
         elif name is None:
             name = "default_program"
 
-        #from cupy.cuda.compiler import _NVRTCProgram as NVRTCProgram
-        #prog = NVRTCProgram(src, name, **kwargs)
-        from pynvrtc.compiler import Program
-        prog = Program(src, name)
+        # TODO is there a public API for that?
+        from cupy.cuda.compiler import _NVRTCProgram as NVRTCProgram
+        prog = NVRTCProgram(src, name, **kwargs)
+        #from pynvrtc.compiler import Program
+        #prog = Program(src, name)
         flags = self._compile_flags
 
         # get cuda and optix_include_paths
@@ -120,10 +121,10 @@ cdef class Module:
         optix_include_path = get_optix_include_path()
 
         flags.extend([f'-I{cuda_include_path}', f'-I{optix_include_path}'])
-        ptx = prog.compile(flags).encode('ascii')
+        ptx, _ = prog.compile(flags)
+        #ptx = ptx.encode('ascii')
         return ptx
 
-    @property
-    def c_obj(self):
-        return <size_t>&self._module
+    #cpdef size_t c_obj(self):
+    #    return <size_t>(<OptixModule>self._module)
 

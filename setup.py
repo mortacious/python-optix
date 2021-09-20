@@ -27,7 +27,7 @@ cuda_include_path = util.get_cuda_include_path()
 optix_include_path = util.get_optix_include_path()
 if cuda_include_path is None or optix_include_path is None:
     raise RuntimeError("Cuda or optix not found in the system")
-
+print(cuda_include_path, optix_include_path)
 extensions = [Extension("*", ["optix/*.pyx"], include_dirs=[cuda_include_path, optix_include_path], extra_compile_args=['-O0'])]
 
 

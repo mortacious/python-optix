@@ -297,4 +297,4 @@ cdef class Pipeline:
         stream = cp.cuda.Stream()
         d_params = params.to_gpu(stream=stream)
         cdef size_t c_stream = stream.ptr
-        optix_check_return(optixLaunch(self._pipeline, <CUstream>c_stream, d_params, params.itemsize, &sbt._shader_binding_table, c_dims[0], c_dims[1], c_dims[2]))
+        optix_check_return(optixLaunch(self._pipeline, <CUstream>c_stream, d_params.data.ptr, params.itemsize, <const OptixShaderBindingTable*>sbt.c_obj(), c_dims[0], c_dims[1], c_dims[2]))

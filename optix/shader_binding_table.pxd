@@ -22,3 +22,5 @@ cdef class ShaderBindingTable:
     cdef object _d_miss_records
     cdef object _d_hitgroup_records
     cdef object _d_callables_records
+
+    cpdef size_t c_obj(self)
