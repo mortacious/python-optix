@@ -2,7 +2,7 @@ from .common cimport OptixResult
 from .program_group cimport OptixProgramGroup, ProgramGroup
 
 
-cdef extern from "optix_includes.h":
+cdef extern from "optix_includes.h" nogil:
     cdef size_t OPTIX_SBT_RECORD_HEADER_SIZE
     cdef size_t OPTIX_SBT_RECORD_ALIGNMENT
 

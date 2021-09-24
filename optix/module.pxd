@@ -1,3 +1,4 @@
+from .base cimport OptixObject
 from .common cimport OptixResult, OptixModule
 from .context cimport OptixDeviceContext
 from .build cimport OptixPrimitiveType
@@ -67,7 +68,7 @@ cdef class ModuleCompileOptions:
     cdef OptixModuleCompileOptions _compile_options
 
 
-cdef class Module:
+cdef class Module(OptixObject):
     cdef OptixModule _module
     cdef list _compile_flags
 

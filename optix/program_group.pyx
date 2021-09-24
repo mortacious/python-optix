@@ -7,7 +7,7 @@ from libc.string cimport memset
 
 optix_init()
 
-cdef class ProgramGroup:
+cdef class ProgramGroup(OptixObject):
     def __init__(self,
                  DeviceContext context,
                  Module raygen_module=None,
@@ -27,7 +27,7 @@ cdef class ProgramGroup:
                  Module hitgroup_module_IS=None,
                  str hitgroup_entry_function_name_IS=None
                  ):
-
+        super().__init__(context)
         cdef bytes tmp_entry_function_name_1
         cdef bytes tmp_entry_function_name_2
         cdef bytes tmp_entry_function_name_3
@@ -99,7 +99,7 @@ cdef class ProgramGroup:
 
         cdef OptixProgramGroupOptions options # init to zero
         memset(&options, 0, sizeof(options))
-        optix_check_return(optixProgramGroupCreate(context.device_context, &desc, 1, &options, NULL, NULL, &self._program_group))
+        optix_check_return(optixProgramGroupCreate(self.context.c_context, &desc, 1, &options, NULL, NULL, &self._program_group))
 
     def __dealloc__(self):
         if <size_t>self._program_group != 0:

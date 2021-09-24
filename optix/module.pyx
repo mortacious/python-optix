@@ -76,7 +76,7 @@ cdef _is_ptx(src):
             continue
         return line.startswith(b'.version')
 
-cdef class Module:
+cdef class Module(OptixObject):
     def __init__(self,
                  DeviceContext context,
                  src,
@@ -84,13 +84,14 @@ cdef class Module:
                  PipelineCompileOptions pipeline_compile_options = PipelineCompileOptions(),
                  compile_flags=_nvrtc_compile_flags_default,
                  program_name=None):
+        super().__init__(context)
         self._compile_flags = list(compile_flags)
         if not _is_ptx(src):
             ptx = self._compile_cuda_ptx(src, name=program_name)
         else:
             ptx = src
         cdef const char* c_ptx = ptx
-        optixModuleCreateFromPTX(context.device_context,
+        optixModuleCreateFromPTX(self.context.c_context,
                                  &(module_compile_options._compile_options),
                                  &(pipeline_compile_options._compile_options),
                                  c_ptx,

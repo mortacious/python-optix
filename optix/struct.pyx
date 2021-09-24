@@ -4,7 +4,11 @@ import numpy as np
 import ctypes
 import cupy as cp
 from .common import round_up
+from .common cimport optix_init
+cimport cython
+#cimport numpy as np
 
+optix_init()
 
 def  _aligned_itemsize( formats, alignment ):
     names = []
@@ -34,10 +38,10 @@ def array_to_device_memory(numpy_array, stream=None):
 SBT_RECORD_ALIGNMENT = OPTIX_SBT_RECORD_ALIGNMENT
 SBT_RECORD_HEADER_SIZE = OPTIX_SBT_RECORD_HEADER_SIZE
 
+
 cdef class _StructHelper(object):
     def __init__(self, names=(), formats=(), size=1, alignment=1):
         self.array_values = {} # init dict
-        print("converting dtype")
         self.dtype = self._convert_to_aligned_dtype(names, formats, alignment)
         self._array = self._create(size)
 
@@ -68,14 +72,12 @@ cdef class _StructHelper(object):
 
         """
         itemsize = _aligned_itemsize(formats, alignment)
-        print(itemsize)
         dtype = np.dtype({
             'names': names,
             'formats': formats,
             'itemsize': itemsize,
             'align': True
         })
-        print("dtype", dtype)
 
         return dtype
 
@@ -83,7 +85,7 @@ cdef class _StructHelper(object):
         return array
 
     def _create(self, size):
-        array = np.empty(size, dtype=self.dtype)
+        array = np.zeros(size, dtype=self.dtype)
         array = self._prepare_array(array)
         return array
 
@@ -119,28 +121,27 @@ cdef class SbtRecord(_StructHelper):
         header_format = '{}B'.format(OPTIX_SBT_RECORD_HEADER_SIZE)
         names = ('header',) + names
         formats = (header_format,) + formats
-        print("super init")
         super().__init__(names, formats, size=size, alignment=OPTIX_SBT_RECORD_ALIGNMENT)
-        print("super done")
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def _prepare_array(self, array):
-        print("preparing", array)
-        cdef size_t itemsize = self.dtype.itemsize
-        # view the array as bytes
-        #view = array.view('B').reshape(-1, itemsize)
+        cdef size_t itemsize = array.dtype.itemsize
         cdef size_t i
         cdef size_t size = array.shape[0]
-        #cdef unsigned char* buffer = <unsigned char*>array.data.data
         cdef unsigned char[:, ::1] buffer =  array.view('B').reshape(-1, itemsize)
-        #cdef char[:, :, ::1] c_view = view
-        print("buffer", buffer[0, itemsize-3], <size_t>&buffer[0,0])
-        print("size", size)# fill each entry with the header
-        # TODO make sure this loop is all in C
-        #for i in range(size):
-            #print("packing header")
-            #print(<size_t>(&buffer[0, 0]),<size_t>(&buffer[0, 0] + i * itemsize), i, itemsize)
-        #    optixSbtRecordPackHeader(self.program_group._program_group, <void*>(&buffer[0, 0]))
+        for i in range(size):
+            optixSbtRecordPackHeader(self.program_group._program_group, <void *>(&buffer[i, 0]))
         return array
+        #insert_array_sbt_header(, array)
+        # cdef size_t itemsize = self.dtype.itemsize
+        # cdef size_t i
+        # cdef size_t size = array.shape[0]
+        # cdef unsigned char[:, ::1] buffer =  array.view('B').reshape(-1, itemsize)
+        # # TODO make sure this loop is all in C
+        # for i in range(size):
+        #     optixSbtRecordPackHeader(self.program_group._program_group, <void*>(&buffer[i, 0]))
+        #return array
 
 
 cdef class LaunchParamsRecord(_StructHelper):

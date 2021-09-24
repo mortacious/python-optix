@@ -80,7 +80,7 @@ def launch_pipeline(pipeline : ox.Pipeline, sbt, gas, centers, ray_direction):
     params['visible'] = visible.data.ptr
     params['ray_direction'] = ray_direction
     params['tolerance'] = 0.15
-    params['trav_handle'] = gas.c_obj()
+    params['trav_handle'] = gas.handle
 
     stream = cp.cuda.Stream()
 
@@ -98,7 +98,6 @@ def log_callback(level, tag, msg):
 
 
 if __name__ == "__main__":
-    input()
     ctx = ox.DeviceContext(validation_mode=True, log_callback_function=log_callback, log_callback_level=4)
     ctx.cache_enabled = False
 
@@ -125,5 +124,7 @@ if __name__ == "__main__":
 
     visible = visible.astype(np.float32)
     print(visible)
+    print("done")
+    #input()
 
 

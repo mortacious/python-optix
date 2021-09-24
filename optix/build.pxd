@@ -1,7 +1,7 @@
 from .common cimport OptixResult
 from .context cimport OptixDeviceContext, DeviceContext
 from libcpp.vector cimport vector
-
+from .base cimport OptixObject
 
 cdef extern from "optix.h" nogil:
     # build functions and structs
@@ -300,9 +300,7 @@ cdef class BuildInputInstanceArray(BuildInputArray):
     cdef object _d_instances
 
 
-cdef class AccelerationStructure:
-    cdef DeviceContext context
+cdef class AccelerationStructure(OptixObject):
     cdef unsigned int _build_flags
     cdef object _gas_buffer
     cdef OptixTraversableHandle _handle
-    cpdef size_t c_obj(self)

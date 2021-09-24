@@ -326,9 +326,9 @@ cdef class BuildInputInstanceArray(BuildInputArray):
         build_input.instanceArray = self.build_input
 
 
-cdef class AccelerationStructure:
+cdef class AccelerationStructure(OptixObject):
     def __init__(self, DeviceContext context, build_inputs, compact=True, allow_update=False, prefer_fast_build=False, random_vertex_access=False, random_instance_access=False):
-        self.context = context
+        super().__init__(context)
         self._build_flags = OPTIX_BUILD_FLAG_NONE
         if compact:
             self._build_flags |= OPTIX_BUILD_FLAG_ALLOW_COMPACTION
@@ -382,7 +382,7 @@ cdef class AccelerationStructure:
         cdef CUdeviceptr tmp_gas_buffer_ptr
         cdef unsigned int num_properties = 0
 
-        optix_check_return(optixAccelComputeMemoryUsage(self.context.device_context,
+        optix_check_return(optixAccelComputeMemoryUsage(self.context.c_context,
                                                         accel_options.data(),
                                                         inputs.data(),
                                                         inputs_size,
@@ -451,7 +451,7 @@ cdef class AccelerationStructure:
         cdef size_t c_stream = stream.ptr
 
         # build acceleration structure without the gil
-        optix_check_return(optixAccelBuild(self.context.device_context,
+        optix_check_return(optixAccelBuild(self.context.c_context,
                                           <CUstream>c_stream,
                                           accel_options.data(),
                                           inputs.data(),
@@ -474,7 +474,7 @@ cdef class AccelerationStructure:
                 d_gas_output_buffer = cp.cuda.alloc(compacted_gas_size)
                 gas_buffer_ptr = d_gas_output_buffer.ptr
                 with nogil:
-                    optix_check_return(optixAccelCompact(self.context.device_context,
+                    optix_check_return(optixAccelCompact(self.context.c_context,
                                                          0,  # TODO use actual cuda stream
                                                          self._handle,
                                                          gas_buffer_ptr,
@@ -485,6 +485,7 @@ cdef class AccelerationStructure:
     def update(self, build_input):
         raise NotImplementedError()
 
-    cpdef size_t c_obj(self):
+    @property
+    def handle(self):
         return <OptixTraversableHandle>self._handle
 

@@ -1,3 +1,4 @@
+from .base cimport OptixObject
 from .common cimport OptixResult, OptixModule
 from .context cimport OptixDeviceContext
 
@@ -77,5 +78,5 @@ cdef extern from "optix_includes.h" nogil:
 
 
 
-cdef class ProgramGroup:
+cdef class ProgramGroup(OptixObject):
     cdef OptixProgramGroup _program_group

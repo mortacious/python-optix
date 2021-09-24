@@ -153,8 +153,9 @@ cdef class PipelineLinkOptions:
 
 ctypedef vector[unsigned int] uint_vector
 
-cdef class Pipeline:
+cdef class Pipeline(OptixObject):
     def __init__(self, DeviceContext context, PipelineCompileOptions compile_options, PipelineLinkOptions link_options, program_groups, max_traversable_graph_depth=1):
+        super().__init__(context)
         program_groups = ensure_iterable(program_groups)
 
         if not all(isinstance(p, ProgramGroup) for p in program_groups):
@@ -172,7 +173,7 @@ cdef class Pipeline:
         for i in range(len(program_groups)):
             optix_check_return(optixUtilAccumulateStackSizes(c_program_groups[i], &self._stack_sizes))
         print("creating pipeline ...")
-        optix_check_return(optixPipelineCreate(context.device_context,
+        optix_check_return(optixPipelineCreate(self.context.c_context,
                                                &compile_options._compile_options,
                                                &link_options._link_options,
                                                c_program_groups.const_data(),
@@ -281,6 +282,7 @@ cdef class Pipeline:
                     free(c_program_groups_closesthit[i])
 
     def __dealloc__(self):
+        print("destroying pipeline")
         if <size_t>self._pipeline != 0:
             optix_check_return(optixPipelineDestroy(self._pipeline))
 
