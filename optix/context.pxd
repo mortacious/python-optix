@@ -43,9 +43,14 @@ cdef extern from "optix_includes.h" nogil:
     cdef OptixResult optixDeviceContextSetLogCallback(OptixDeviceContext context, OptixLogCallback callbackFunction,
                                                       void *callbackData, unsigned int callbackLevel)
 
+cdef class _LogWrapper:
+    cdef object log_function
+    cdef bint enabled
+
+
 cdef class DeviceContext:
     cdef OptixDeviceContext c_context
-    cdef object _log_callback_function
+    cdef _LogWrapper _log_callback
     cdef unsigned int _log_callback_level
     cdef unsigned int _get_property(self, OptixDeviceProperty property)
     cdef bint _validation_mode

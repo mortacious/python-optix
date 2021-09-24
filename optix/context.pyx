@@ -6,13 +6,19 @@ import cupy as cp
 
 optix_init()
 
-#cdef void context_log_cb(unsigned int level, const char* tag, const char* message, void* cbdata) with gil:
-#    context_log_cb_impl(level, tag, message, cbdata)
+cdef class _LogWrapper:
+    def __init__(self, log_function):
+        self.log_function = log_function
+        self.enabled = True
 
-cdef void context_log_cb(unsigned int level, const char* tag, const char* message, void* cbdata) with gil:
-    cdef object cb_object = <object>cbdata # cast the cbdata to a pyobject
-    if cb_object[1]: # in case logging is disabled already
-        cb_object[0](level, tag.decode(), message.decode())
+    def __call__(self, level, tag, message):
+        self.log_function(level, tag, message)
+
+
+cdef void context_log_cb(unsigned int level, const char * tag, const char * message, void * cbdata) with gil:
+    cdef _LogWrapper cb_object = <_LogWrapper> cbdata  # cast the cbdata to a pyobject
+    if cb_object.enabled:  # in case logging is disabled already
+        cb_object(level, tag.decode(), message.decode())
 
 
 cdef class DeviceContext:
@@ -20,11 +26,10 @@ cdef class DeviceContext:
         cdef OptixDeviceContextOptions options
         cp.cuda.runtime.free(0)
 
-        self._log_callback_function = [log_callback_function, True]
-
-        if self._log_callback_function is not None:
+        if log_callback_function is not None:
+            self._log_callback = _LogWrapper(log_callback_function)
             options.logCallbackFunction = context_log_cb
-            options.logCallbackData = <void*>self._log_callback_function # cast to pointer here and keep the python object stored in this class
+            options.logCallbackData = <void*>self._log_callback # cast to pointer here and keep the python object stored in this class
 
         self._log_callback_level = log_callback_level
         options.logCallbackLevel = self._log_callback_level
@@ -34,7 +39,7 @@ cdef class DeviceContext:
             optix_check_return(optixDeviceContextCreate(<CUcontext>0, &options, &self.c_context))
 
     def __dealloc__(self):
-        self._log_callback_function[1] = False
+        self._log_callback.enabled = False
         optix_check_return(optixDeviceContextDestroy(self.c_context))
 
 
