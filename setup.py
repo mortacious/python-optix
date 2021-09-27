@@ -27,23 +27,37 @@ cuda_include_path = util.get_cuda_include_path()
 optix_include_path = util.get_optix_include_path()
 if cuda_include_path is None or optix_include_path is None:
     raise RuntimeError("Cuda or optix not found in the system")
-print(cuda_include_path, optix_include_path)
+
 extensions = [Extension("*", ["optix/*.pyx"], include_dirs=[cuda_include_path, optix_include_path], extra_compile_args=['-O0'])]
 
+with open("README.md", "r", encoding="utf-8") as fh:
+    long_description = fh.read()
 
 setup(
-    version="0.1.0",
+    name="python-optix",
+    version="0.0.1",
     author="Felix Igelbrink",
     author_email="felix.igelbrink@uni-osnabrueck.de",
-    name="python-optix",
-    description="Python bindings to the optix raytracing framework by nvidia",
-    ext_modules=cythonize(extensions, language_level="3", annotate=True),
+    description="Python bindings to the optiX raytracing framework by nvidia",
+    long_description=long_description,
+    long_descriptiopn_content_type="text/markdown",
+    url="https://github.com/mortacious/python-optix",
+    project_urls={
+        "Bug Tracker": "https://github.com/mortacious/python-optix/issues",
+    },
+    ext_modules=cythonize(extensions, language_level="3"),
     install_requires=[
-        'numpy>=1.21',
-        'cupy>=9.4'
+        'numpy',
+        'cupy>=9.0'
     ],
     license="TBD",
     classifiers=[
-        'Private :: Do Not Upload to pypi server',
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: Linux",
     ],
+    extras_require={
+        'examples': ["pillow"]
+    },
+    python_requires=">=3.8"
 )

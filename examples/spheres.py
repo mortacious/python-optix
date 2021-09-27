@@ -23,7 +23,7 @@ def create_acceleration_structure(ctx, centers, radii):
 
 def create_module(ctx, pipeline_opts):
     compile_opts = ox.ModuleCompileOptions(debug_level=ox.CompileDebugLevel.LINEINFO)
-    module = ox.Module(ctx, 'spheres.cu', compile_opts, pipeline_opts)
+    module = ox.Module(ctx, 'cuda/spheres.cu', compile_opts, pipeline_opts)
     return module
 
 

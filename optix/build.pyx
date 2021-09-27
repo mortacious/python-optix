@@ -523,7 +523,7 @@ cdef class AccelerationStructure(OptixObject):
         # do the relocation
         cls = self.__class__
         cdef AccelerationStructure result = cls.__new__(cls)
-        
+
         memodict[id(self)] = result
 
         result.context = self.context

@@ -1,1 +1,1 @@
-exclude optix/*.html
+include optix/*.pxd
