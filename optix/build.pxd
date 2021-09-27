@@ -240,21 +240,6 @@ cdef extern from "optix.h" nogil:
                                            OptixTraversableHandle * traversableHandle
                                            )
 
-
-# cdef extern from "cuda_runtime.h":
-#     ctypedef enum cudaError_t:
-#         pass
-#
-#     cdef enum cudaMemcpyKind:
-#         cudaMemcpyHostToHost,
-#         cudaMemcpyHostToDevice,
-#         cudaMemcpyDeviceToHost,
-#         cudaMemcpyDeviceToDevice,
-#         cudaMemcpyDefault
-#
-#     cudaError_t cudaMemcpy( void* dst, const void* src, size_t count, cudaMemcpyKind kind )
-
-
 cdef class BuildInputArray:
     cdef void prepare_build_input(self, OptixBuildInput* build_input) except *
 
@@ -292,15 +277,21 @@ cdef class BuildInputCurveArray(BuildInputArray):
 
 cdef class Instance:
     cdef OptixInstance _instance
-    cdef object _traversable
+    cdef AccelerationStructure traversable
 
 
 cdef class BuildInputInstanceArray(BuildInputArray):
     cdef OptixBuildInputInstanceArray _build_input
+    cdef object instances
     cdef object _d_instances
 
 
 cdef class AccelerationStructure(OptixObject):
     cdef unsigned int _build_flags
     cdef object _gas_buffer
+    cdef OptixAccelBufferSizes _buffer_sizes
+    cdef object _instances
     cdef OptixTraversableHandle _handle
+    cdef void _init_build_inputs(self, build_inputs, vector[OptixBuildInput]& ret)
+    cdef void _init_accel_options(self, size_t num_build_inputs, unsigned int build_flags, OptixBuildOperation operation, vector[OptixAccelBuildOptions]& ret)
+    cdef void build(self, build_inputs, stream=*)
