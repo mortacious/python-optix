@@ -159,7 +159,7 @@ cdef class Pipeline(OptixObject):
             raise TypeError("Only program groups")
         cdef unsigned int num_program_groups = len(program_groups)
         cdef vector[OptixProgramGroup] c_program_groups = vector[OptixProgramGroup](num_program_groups)
-        cdef int i
+        cdef unsigned int i
         cdef OptixProgramGroupOptions options
         cdef ProgramGroup grp
         for i in range(num_program_groups):

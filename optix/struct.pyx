@@ -135,15 +135,6 @@ cdef class SbtRecord(_StructHelper):
         for i in range(size):
             optixSbtRecordPackHeader(self.program_group._program_group, <void *>(&buffer[i, 0]))
         return array
-        #insert_array_sbt_header(, array)
-        # cdef size_t itemsize = self.dtype.itemsize
-        # cdef size_t i
-        # cdef size_t size = array.shape[0]
-        # cdef unsigned char[:, ::1] buffer =  array.view('B').reshape(-1, itemsize)
-        # # TODO make sure this loop is all in C
-        # for i in range(size):
-        #     optixSbtRecordPackHeader(self.program_group._program_group, <void*>(&buffer[i, 0]))
-        #return array
 
 
 cdef class LaunchParamsRecord(_StructHelper):
