@@ -3,10 +3,9 @@
 import numpy as np
 import ctypes
 import cupy as cp
-from .common import round_up
+from .common import round_up, ensure_iterable
 from .common cimport optix_init
 cimport cython
-#cimport numpy as np
 
 optix_init()
 
@@ -24,9 +23,6 @@ def  _aligned_itemsize( formats, alignment ):
 
 
 def array_to_device_memory(numpy_array, stream=None):
-    if stream is None:
-        stream = cp.cuda.Stream()
-
     byte_size = numpy_array.size*numpy_array.dtype.itemsize
 
     h_ptr = ctypes.c_void_p( numpy_array.ctypes.data )
@@ -41,6 +37,9 @@ SBT_RECORD_HEADER_SIZE = OPTIX_SBT_RECORD_HEADER_SIZE
 
 cdef class _StructHelper(object):
     def __init__(self, names=(), formats=(), size=1, alignment=1):
+        names = ensure_iterable(names)
+        formats = ensure_iterable(formats)
+
         self.array_values = {} # init dict
         self.dtype = self._convert_to_aligned_dtype(names, formats, alignment)
         self._array = self._create(size)
@@ -117,6 +116,9 @@ cdef class _StructHelper(object):
 
 cdef class SbtRecord(_StructHelper):
     def __init__(self, ProgramGroup program_group, names=(), formats=(), size=1):
+        names = ensure_iterable(names)
+        formats = ensure_iterable(formats)
+
         self.program_group = program_group
         header_format = '{}B'.format(OPTIX_SBT_RECORD_HEADER_SIZE)
         names = ('header',) + names

@@ -102,7 +102,6 @@ cdef class Module(OptixObject):
 
     def _compile_cuda_ptx(self, src, name=None, **kwargs):
         if os.path.exists(src):
-            print("is file")
             name = src
             with open(src, 'r') as f:
                 src = f.read()

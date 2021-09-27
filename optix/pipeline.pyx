@@ -10,8 +10,6 @@ from libc.stdlib cimport malloc, free
 from .struct cimport LaunchParamsRecord
 from .struct import LaunchParamsRecord
 from .shader_binding_table cimport ShaderBindingTable
-from cython.operator cimport dereference as deref
-import cupy as cp
 
 optix_init()
 
@@ -55,7 +53,6 @@ cdef class PipelineCompileOptions:
                  exception_flags = ExceptionFlags.NONE,
                  pipeline_launch_params_variable_name = "params",
                  uses_primitive_type_flags = PrimitiveTypeFlags.DEFAULT):
-        #self._compile_options = []
         self._compile_options.usesMotionBlur = uses_motion_blur
         self._compile_options.traversableGraphFlags = traversable_graph_flags.value
         self._compile_options.numPayloadValues = num_payload_values
@@ -151,7 +148,6 @@ cdef class PipelineLinkOptions:
     def c_obj(self):
         return <size_t>&self._link_options
 
-ctypedef vector[unsigned int] uint_vector
 
 cdef class Pipeline(OptixObject):
     def __init__(self, DeviceContext context, PipelineCompileOptions compile_options, PipelineLinkOptions link_options, program_groups, max_traversable_graph_depth=1):
@@ -169,10 +165,8 @@ cdef class Pipeline(OptixObject):
             grp = <ProgramGroup>program_groups[i]
             c_program_groups[i] = grp._program_group
 
-        print("computing stack sizes")
         for i in range(len(program_groups)):
             optix_check_return(optixUtilAccumulateStackSizes(c_program_groups[i], &self._stack_sizes))
-        print("creating pipeline ...")
         optix_check_return(optixPipelineCreate(self.context.c_context,
                                                &compile_options._compile_options,
                                                &link_options._link_options,
@@ -282,7 +276,6 @@ cdef class Pipeline(OptixObject):
                     free(c_program_groups_closesthit[i])
 
     def __dealloc__(self):
-        print("destroying pipeline")
         if <size_t>self._pipeline != 0:
             optix_check_return(optixPipelineDestroy(self._pipeline))
 
@@ -290,13 +283,17 @@ cdef class Pipeline(OptixObject):
     def c_obj(self):
         return <size_t>&self._pipeline
 
-    def launch(self, stream, ShaderBindingTable sbt, tuple dimensions, LaunchParamsRecord params=None):
+    def launch(self, ShaderBindingTable sbt, tuple dimensions, LaunchParamsRecord params=None, stream=None):
+        ctypedef vector[unsigned int] uint_vector
+
         cdef uint_vector c_dims = uint_vector(3, 1)
         cdef int i
         for i in range(len(dimensions)):
             c_dims[i] = dimensions[i]
 
-        stream = cp.cuda.Stream()
+        cdef size_t c_stream = 0
+        if stream is not None:
+            c_stream = stream.ptr
+
         d_params = params.to_gpu(stream=stream)
-        cdef size_t c_stream = stream.ptr
         optix_check_return(optixLaunch(self._pipeline, <CUstream>c_stream, d_params.data.ptr, params.itemsize, <const OptixShaderBindingTable*>sbt.c_obj(), c_dims[0], c_dims[1], c_dims[2]))

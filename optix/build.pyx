@@ -48,6 +48,9 @@ cdef class BuildInputArray:
     cdef void prepare_build_input(self, OptixBuildInput* build_input) except *:
         pass
 
+    cdef size_t num_elements(self):
+        return 0
+
 
 cdef class BuildInputTriangleArray(BuildInputArray):
     def __init__(self,
@@ -59,7 +62,7 @@ cdef class BuildInputTriangleArray(BuildInputArray):
                  pre_transform = None,
                  primitive_index_offset = 0
                  ):
-        self._d_vertex_buffers = [cp.asarray(vb) for vb in vertex_buffers]
+        self._d_vertex_buffers = [cp.asarray(vb) for vb in ensure_iterable(vertex_buffers)]
         self._d_vertex_buffer_ptrs.reserve(len(self._d_vertex_buffers))
 
         if len(self._d_vertex_buffers) > 0:
@@ -164,6 +167,8 @@ cdef class BuildInputTriangleArray(BuildInputArray):
         else:
             raise ValueError("Unsupported dtype")
 
+    cdef size_t num_elements(self):
+        return self._build_input.numVertices
 
 cdef class BuildInputCustomPrimitiveArray(BuildInputArray):
     def __init__(self,
@@ -225,6 +230,9 @@ cdef class BuildInputCustomPrimitiveArray(BuildInputArray):
         build_input.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES
         build_input.customPrimitiveArray = self._build_input
 
+    cdef size_t num_elements(self):
+        return self._build_input.numPrimitives
+
 
 cdef class BuildInputCurveArray(BuildInputArray):
     def __init__(self, curve_type, vertex_buffers, width_buffers, normal_buffers, index_buffer, flags=None, primitive_index_offset=0):
@@ -285,6 +293,9 @@ cdef class BuildInputCurveArray(BuildInputArray):
         build_input.type = OPTIX_BUILD_INPUT_TYPE_CURVES
         build_input.curveArray = self._build_input
 
+    cdef size_t num_elements(self):
+        return self._build_input.numPrimitives
+
 
 cdef class Instance:
     def __init__(self, AccelerationStructure traversable, unsigned int instance_id, flags = InstanceFlags.NONE, unsigned int sbt_offset = 0, transform=None, visibility_mask=None):
@@ -335,6 +346,9 @@ cdef class BuildInputInstanceArray(BuildInputArray):
         build_input.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES
         build_input.instanceArray = self._build_input
 
+    cdef size_t num_elements(self):
+        return self._build_input.numInstances
+
 
 
 cdef class AccelerationStructure(OptixObject):
@@ -371,8 +385,16 @@ cdef class AccelerationStructure(OptixObject):
 
     cdef void _init_build_inputs(self, build_inputs, vector[OptixBuildInput]& ret):
         ret.resize(len(build_inputs))
+        self._num_elements = 0
         for i, build_input in enumerate(build_inputs):
+            if self._num_elements == 0:
+                self._num_elements = (<BuildInputArray>build_input).num_elements()
+            else:
+                if self._num_elements != (<BuildInputArray>build_input).num_elements():
+                    raise ValueError("All build inputs must have the same number of elements")
+
             (<BuildInputArray>build_input).prepare_build_input(&ret[i])
+
 
     cdef void _init_accel_options(self, size_t num_build_inputs, unsigned int build_flags, OptixBuildOperation operation, vector[OptixAccelBuildOptions]& ret):
         cdef OptixAccelBuildOptions accel_option
@@ -393,7 +415,6 @@ cdef class AccelerationStructure(OptixObject):
         cdef vector[OptixBuildInput] inputs #= vector[OptixBuildInput](inputs_size)
 
         self._init_build_inputs(build_inputs, inputs)
-
 
         if isinstance(build_inputs[0], BuildInputInstanceArray):
             if inputs_size > 1:
@@ -570,6 +591,9 @@ cdef class AccelerationStructure(OptixObject):
     @property
     def handle(self):
         return <OptixTraversableHandle>self._handle
+
+    def __repr__(self):
+        return f"<optix.{self.__class__.__name__}({self._num_elements} elements in {self._buffer_sizes.outputSizeInBytes} bytes)>"
 
 
 

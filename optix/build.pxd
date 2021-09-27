@@ -242,6 +242,7 @@ cdef extern from "optix.h" nogil:
 
 cdef class BuildInputArray:
     cdef void prepare_build_input(self, OptixBuildInput* build_input) except *
+    cdef size_t num_elements(self)
 
 
 cdef class BuildInputTriangleArray(BuildInputArray):
@@ -253,7 +254,6 @@ cdef class BuildInputTriangleArray(BuildInputArray):
     cdef object _d_pre_transform
     cdef vector[unsigned int] _flags
 
-    cdef void prepare_build_input(self, OptixBuildInput * build_input) except *
 
 cdef class BuildInputCustomPrimitiveArray(BuildInputArray):
     cdef OptixBuildInputCustomPrimitiveArray _build_input
@@ -289,6 +289,7 @@ cdef class BuildInputInstanceArray(BuildInputArray):
 cdef class AccelerationStructure(OptixObject):
     cdef unsigned int _build_flags
     cdef object _gas_buffer
+    cdef size_t _num_elements
     cdef OptixAccelBufferSizes _buffer_sizes
     cdef object _instances
     cdef OptixTraversableHandle _handle
