@@ -1,9 +1,4 @@
-//
-// Created by mortacious on 7/29/21.
-//
-
 #pragma once
-
 
 namespace sphere {
     const unsigned int NUM_ATTRIBUTE_VALUES = 2u;
@@ -20,7 +15,6 @@ struct Params
     unsigned int* visible;
     float3 ray_direction;
     float tolerance;
-    //float ray_max;
     OptixTraversableHandle handle;
 };
 
