@@ -148,6 +148,7 @@ cdef class PipelineLinkOptions:
     def c_obj(self):
         return <size_t>&self._link_options
 
+ctypedef vector[unsigned int] uint_vector
 
 cdef class Pipeline(OptixObject):
     def __init__(self, DeviceContext context, PipelineCompileOptions compile_options, PipelineLinkOptions link_options, program_groups, max_traversable_graph_depth=1):
@@ -284,8 +285,6 @@ cdef class Pipeline(OptixObject):
         return <size_t>&self._pipeline
 
     def launch(self, ShaderBindingTable sbt, tuple dimensions, LaunchParamsRecord params=None, stream=None):
-        ctypedef vector[unsigned int] uint_vector
-
         cdef uint_vector c_dims = uint_vector(3, 1)
         cdef int i
         for i in range(len(dimensions)):
