@@ -1,8 +1,9 @@
 # distutils: language = c++
 
 cdef class OptixObject:
-    def __init__(self, DeviceContext context):
-        self.context = context
+    """
+    Base class for all optix objects providing common utilities
+    """
 
     def _repr_details(self):
         return ""

@@ -1,4 +1,5 @@
 from .common cimport CUdeviceptr
+from .base cimport OptixObject
 
 cdef extern from "optix_includes.h" nogil:
     cdef struct OptixShaderBindingTable:
@@ -14,7 +15,7 @@ cdef extern from "optix_includes.h" nogil:
         unsigned int   callablesRecordStrideInBytes
         unsigned int   callablesRecordCount
 
-cdef class ShaderBindingTable:
+cdef class ShaderBindingTable(OptixObject):
     cdef OptixShaderBindingTable sbt
     cdef object _d_raygen_record
     cdef object _d_exception_record

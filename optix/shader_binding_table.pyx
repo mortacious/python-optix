@@ -8,7 +8,7 @@ import numpy as np
 
 optix_init()
 
-cdef class ShaderBindingTable:
+cdef class ShaderBindingTable(OptixObject):
     def __init__(self,
                  stream=None,
                  raygen_record=None,

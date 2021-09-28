@@ -21,7 +21,7 @@ cdef void context_log_cb(unsigned int level, const char * tag, const char * mess
         cb_object(level, tag.decode(), message.decode())
 
 
-cdef class DeviceContext:
+cdef class DeviceContext(OptixObject):
     def __init__(self, object device=None, object log_callback_function=None, int32_t log_callback_level=1, bint validation_mode=False):
         cdef OptixDeviceContextOptions options
         if device is None:
@@ -161,5 +161,13 @@ cdef class DeviceContext:
     def device(self):
         return self._device
 
-    def __repr__(self):
-        return f"<optix.{self.__class__.__name__}(device id {self._device.id})>"
+    def _repr_details(self):
+        return f"device id {self._device.id}"
+
+
+cdef class OptixContextObject(OptixObject):
+    """
+    Base class for all optix Classes depending on an active context
+    """
+    def __init__(self, DeviceContext context):
+        self.context = context

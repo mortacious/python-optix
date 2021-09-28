@@ -44,7 +44,7 @@ class InstanceFlags(IntFlag):
     DISABLE_TRANSFORM = OPTIX_INSTANCE_FLAG_DISABLE_TRANSFORM
 
 
-cdef class BuildInputArray:
+cdef class BuildInputArray(OptixObject):
     cdef void prepare_build_input(self, OptixBuildInput* build_input) except *:
         pass
 
@@ -297,7 +297,7 @@ cdef class BuildInputCurveArray(BuildInputArray):
         return self._build_input.numPrimitives
 
 
-cdef class Instance:
+cdef class Instance(OptixObject):
     def __init__(self, AccelerationStructure traversable, unsigned int instance_id, flags = InstanceFlags.NONE, unsigned int sbt_offset = 0, transform=None, visibility_mask=None):
         if transform is None:
             transform = np.eye(3, 4, dtype=np.float32)
@@ -351,7 +351,7 @@ cdef class BuildInputInstanceArray(BuildInputArray):
 
 
 
-cdef class AccelerationStructure(OptixObject):
+cdef class AccelerationStructure(OptixContextObject):
     def __init__(self, DeviceContext context, build_inputs, compact=True, allow_update=False, prefer_fast_build=False, random_vertex_access=False, random_instance_access=False, stream=None):
         super().__init__(context)
         self._build_flags = OPTIX_BUILD_FLAG_NONE

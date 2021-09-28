@@ -1,6 +1,6 @@
 from .base cimport OptixObject
 from .common cimport OptixResult, CUdeviceptr, CUstream
-from .context cimport OptixDeviceContext
+from .context cimport OptixDeviceContext, OptixContextObject
 from .program_group cimport ProgramGroup, OptixStackSizes
 from .shader_binding_table cimport OptixShaderBindingTable
 
@@ -136,15 +136,15 @@ cdef extern from "optix_stack_size.h" nogil:
                                                            unsigned int* continuationStackSize
                                                            )
 
-cdef class PipelineCompileOptions:
-    cdef OptixPipelineCompileOptions _compile_options
+cdef class PipelineCompileOptions(OptixObject):
+    cdef OptixPipelineCompileOptions compile_options
     cdef bytes _pipeline_launch_params_variable_name
 
-cdef class PipelineLinkOptions:
-    cdef OptixPipelineLinkOptions _link_options
+cdef class PipelineLinkOptions(OptixObject):
+    cdef OptixPipelineLinkOptions link_options
 
-cdef class Pipeline(OptixObject):
-    cdef OptixPipeline _pipeline
+cdef class Pipeline(OptixContextObject):
+    cdef OptixPipeline pipeline
     cdef OptixStackSizes _stack_sizes
     cdef unsigned int _max_traversable_graph_depth
     cpdef set_stack_sizes(self,

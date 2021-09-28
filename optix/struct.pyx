@@ -113,8 +113,8 @@ cdef class _StructHelper(object):
     def size(self):
         return self._array.shape[0]
 
-    def __repr__(self):
-        return f"<optix.{self.__class__.__name__}(size {self.size}, dtype {self.dtype})>"
+    def _repr_details(self):
+        return f"size {self.size}, dtype {self.dtype}"
 
 
 cdef class SbtRecord(_StructHelper):
@@ -144,5 +144,6 @@ cdef class LaunchParamsRecord(_StructHelper):
     def __init__(self, names=(), formats=(), size=1):
         # init with 8 bytes alignment #TODO is there a constant for that?
         super().__init__(names, formats, size=size, alignment=8)
+
 
 

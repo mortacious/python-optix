@@ -1,6 +1,6 @@
 from .base cimport OptixObject
 from .common cimport OptixResult, OptixModule
-from .context cimport OptixDeviceContext
+from .context cimport OptixDeviceContext, OptixContextObject
 from .build cimport OptixPrimitiveType
 from .pipeline cimport OptixPipelineCompileOptions
 
@@ -64,12 +64,12 @@ cdef extern from "optix_includes.h" nogil:
                                         OptixModule *builtinModule)
 
 
-cdef class ModuleCompileOptions:
-    cdef OptixModuleCompileOptions _compile_options
+cdef class ModuleCompileOptions(OptixObject):
+    cdef OptixModuleCompileOptions compile_options
 
 
-cdef class Module(OptixObject):
-    cdef OptixModule _module
+cdef class Module(OptixContextObject):
+    cdef OptixModule module
     cdef list _compile_flags
 
     #cpdef size_t c_obj(self)

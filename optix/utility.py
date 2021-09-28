@@ -1,4 +1,4 @@
-# Uses Code from the cupy installation scripts
+# Code taken from the cupy installation scripts
 # https://github.com/cupy/cupy/blob/master/install/build.py
 
 # Copyright (c) 2015 Preferred Infrastructure, Inc.

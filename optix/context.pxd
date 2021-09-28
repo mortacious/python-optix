@@ -1,4 +1,5 @@
 from .common cimport OptixResult, CUcontext
+from .base cimport OptixObject
 
 cdef extern from "optix_includes.h" nogil:
     ctypedef struct OptixDeviceContext:
@@ -48,10 +49,14 @@ cdef class _LogWrapper:
     cdef bint enabled
 
 
-cdef class DeviceContext:
+cdef class DeviceContext(OptixObject):
     cdef OptixDeviceContext c_context
     cdef object _device
     cdef _LogWrapper _log_callback
     cdef unsigned int _log_callback_level
     cdef unsigned int _get_property(self, OptixDeviceProperty property)
     cdef bint _validation_mode
+
+
+cdef class OptixContextObject(OptixObject):
+    cdef DeviceContext context

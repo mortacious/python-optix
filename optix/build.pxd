@@ -1,5 +1,5 @@
 from .common cimport OptixResult, CUstream, CUdeviceptr
-from .context cimport OptixDeviceContext
+from .context cimport OptixDeviceContext, OptixContextObject
 from libcpp.vector cimport vector
 from .base cimport OptixObject
 from libc.stdint cimport uintptr_t
@@ -240,7 +240,7 @@ cdef extern from "optix.h" nogil:
                                            OptixTraversableHandle * traversableHandle
                                            )
 
-cdef class BuildInputArray:
+cdef class BuildInputArray(OptixObject):
     cdef void prepare_build_input(self, OptixBuildInput* build_input) except *
     cdef size_t num_elements(self)
 
@@ -275,7 +275,7 @@ cdef class BuildInputCurveArray(BuildInputArray):
     cdef object _d_index_buffer
 
 
-cdef class Instance:
+cdef class Instance(OptixObject):
     cdef OptixInstance _instance
     cdef AccelerationStructure traversable
 
@@ -286,7 +286,7 @@ cdef class BuildInputInstanceArray(BuildInputArray):
     cdef object _d_instances
 
 
-cdef class AccelerationStructure(OptixObject):
+cdef class AccelerationStructure(OptixContextObject):
     cdef unsigned int _build_flags
     cdef object _gas_buffer
     cdef size_t _num_elements

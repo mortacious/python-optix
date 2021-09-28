@@ -46,7 +46,7 @@ class PrimitiveTypeFlags(IntFlag):
     TRIANGLE = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE
 
 
-cdef class PipelineCompileOptions:
+cdef class PipelineCompileOptions(OptixObject):
     def __init__(self,
                  uses_motion_blur=False,
                  traversable_graph_flags = TraversableGraphFlags.ALLOW_ANY,
@@ -55,53 +55,53 @@ cdef class PipelineCompileOptions:
                  exception_flags = ExceptionFlags.NONE,
                  pipeline_launch_params_variable_name = "params",
                  uses_primitive_type_flags = PrimitiveTypeFlags.DEFAULT):
-        self._compile_options.usesMotionBlur = uses_motion_blur
-        self._compile_options.traversableGraphFlags = traversable_graph_flags.value
-        self._compile_options.numPayloadValues = num_payload_values
-        self._compile_options.numAttributeValues = num_attribute_values
-        self._compile_options.exceptionFlags = exception_flags.value
+        self.compile_options.usesMotionBlur = uses_motion_blur
+        self.compile_options.traversableGraphFlags = traversable_graph_flags.value
+        self.compile_options.numPayloadValues = num_payload_values
+        self.compile_options.numAttributeValues = num_attribute_values
+        self.compile_options.exceptionFlags = exception_flags.value
         self.pipeline_launch_params_variable_name = pipeline_launch_params_variable_name
-        self._compile_options.usesPrimitiveTypeFlags = uses_primitive_type_flags.value
+        self.compile_options.usesPrimitiveTypeFlags = uses_primitive_type_flags.value
 
     @property
     def uses_motion_blur(self):
-        return self._compile_options.usesMotionBlur
+        return self.compile_options.usesMotionBlur
 
     @uses_motion_blur.setter
     def uses_motion_blur(self, motion_blur):
-        self._compile_options.usesMotionBlur = motion_blur
+        self.compile_options.usesMotionBlur = motion_blur
 
     @property
     def traversable_graph_flags(self):
-        return TraversableGraphFlags(self._compile_options.traversableGraphFlags)
+        return TraversableGraphFlags(self.compile_options.traversableGraphFlags)
 
     @traversable_graph_flags.setter
     def traversable_graph_flags(self, flags):
-        self._compile_options.traversableGraphFlags = flags.value
+        self.compile_options.traversableGraphFlags = flags.value
 
     @property
     def num_payload_values(self):
-        return self._compile_options.numPayloadValues
+        return self.compile_options.numPayloadValues
 
     @num_payload_values.setter
     def num_payload_values(self, num_payload_values):
-        self._compile_options.numPayloadValues = num_payload_values
+        self.compile_options.numPayloadValues = num_payload_values
 
     @property
     def num_attribute_values(self):
-        return self._compile_options.numAttributeValues
+        return self.compile_options.numAttributeValues
 
     @num_attribute_values.setter
     def num_attribute_values(self, num_attribute_values):
-        self._compile_options.numAttributeValues = num_attribute_values
+        self.compile_options.numAttributeValues = num_attribute_values
 
     @property
     def exception_flags(self):
-        return ExceptionFlags(self._compile_options.exceptionFlags)
+        return ExceptionFlags(self.compile_options.exceptionFlags)
 
     @exception_flags.setter
     def exception_flags(self, flags):
-        self._compile_options.exceptionFlags = flags.value
+        self.compile_options.exceptionFlags = flags.value
 
     @property
     def pipeline_launch_params_variable_name(self):
@@ -110,49 +110,46 @@ cdef class PipelineCompileOptions:
     @pipeline_launch_params_variable_name.setter
     def pipeline_launch_params_variable_name(self, name):
         self._pipeline_launch_params_variable_name = name.encode('ascii')
-        self._compile_options.pipelineLaunchParamsVariableName = <const char*>self._pipeline_launch_params_variable_name
+        self.compile_options.pipelineLaunchParamsVariableName = <const char*>self._pipeline_launch_params_variable_name
 
     @property
     def uses_primitive_type_flags(self):
-        return PrimitiveTypeFlags(self._compile_options.usesPrimitiveTypeFlags)
+        return PrimitiveTypeFlags(self.compile_options.usesPrimitiveTypeFlags)
 
     @uses_primitive_type_flags.setter
     def uses_primitive_type_flags(self, flags):
-        self._compile_options.usesPrimitiveTypeFlags = flags.value
+        self.compile_options.usesPrimitiveTypeFlags = flags.value
 
     @property
     def c_obj(self):
-        return <size_t>&self._compile_options
+        return <size_t>&self.compile_options
 
 
-cdef class PipelineLinkOptions:
+cdef class PipelineLinkOptions(OptixObject):
     def __init__(self, unsigned int max_trace_depth = 1, debug_level = CompileDebugLevel.DEFAULT):
-        self._link_options.maxTraceDepth = max_trace_depth
-        self._link_options.debugLevel = debug_level.value
+        self.link_options.maxTraceDepth = max_trace_depth
+        self.link_options.debugLevel = debug_level.value
 
     @property
     def max_trace_depth(self):
-        return self._link_options.maxTraceDepth
+        return self.link_options.maxTraceDepth
 
     @max_trace_depth.setter
     def max_trace_depth(self, unsigned int max_trace_depth):
-        self._link_options.maxTraceDepth = max_trace_depth
+        self.link_options.maxTraceDepth = max_trace_depth
 
     @property
     def debug_level(self):
-        return CompileDebugLevel(self._link_options.debugLevel)
+        return CompileDebugLevel(self.link_options.debugLevel)
 
     @debug_level.setter
     def debug_level(self, debug_level):
-        self._link_options.debugLevel = debug_level.value
+        self.link_options.debugLevel = debug_level.value
 
-    @property
-    def c_obj(self):
-        return <size_t>&self._link_options
 
 ctypedef vector[unsigned int] uint_vector
 
-cdef class Pipeline(OptixObject):
+cdef class Pipeline(OptixContextObject):
     def __init__(self, DeviceContext context, PipelineCompileOptions compile_options, PipelineLinkOptions link_options, program_groups, max_traversable_graph_depth=1):
         super().__init__(context)
         program_groups = ensure_iterable(program_groups)
@@ -171,13 +168,13 @@ cdef class Pipeline(OptixObject):
         for i in range(len(program_groups)):
             optix_check_return(optixUtilAccumulateStackSizes(c_program_groups[i], &self._stack_sizes))
         optix_check_return(optixPipelineCreate(self.context.c_context,
-                                               &compile_options._compile_options,
-                                               &link_options._link_options,
+                                               &compile_options.compile_options,
+                                               &link_options.link_options,
                                                c_program_groups.const_data(),
                                                len(program_groups),
                                                NULL,
                                                NULL,
-                                               &self._pipeline))
+                                               &self.pipeline))
 
         self._max_traversable_graph_depth = max_traversable_graph_depth
 
@@ -185,7 +182,7 @@ cdef class Pipeline(OptixObject):
                           unsigned int direct_callable_stack_size_from_traversal,
                           unsigned int direct_callable_stack_size_from_state,
                           unsigned int continuation_stack_size):
-        optix_check_return(optixPipelineSetStackSize(self._pipeline,
+        optix_check_return(optixPipelineSetStackSize(self.pipeline,
                                                      direct_callable_stack_size_from_traversal,
                                                      direct_callable_stack_size_from_state,
                                                      continuation_stack_size,
@@ -280,8 +277,8 @@ cdef class Pipeline(OptixObject):
                     free(c_program_groups_closesthit[i])
 
     def __dealloc__(self):
-        if <uintptr_t>self._pipeline != 0:
-            optix_check_return(optixPipelineDestroy(self._pipeline))
+        if <uintptr_t>self.pipeline != 0:
+            optix_check_return(optixPipelineDestroy(self.pipeline))
 
     def launch(self, ShaderBindingTable sbt, tuple dimensions, LaunchParamsRecord params=None, stream=None):
         cdef uint_vector c_dims = uint_vector(3, 1)
@@ -294,4 +291,4 @@ cdef class Pipeline(OptixObject):
             c_stream = stream.ptr
 
         d_params = params.to_gpu(stream=stream)
-        optix_check_return(optixLaunch(self._pipeline, <CUstream>c_stream, d_params.data.ptr, params.itemsize, <const OptixShaderBindingTable*>&sbt.sbt, c_dims[0], c_dims[1], c_dims[2]))
+        optix_check_return(optixLaunch(self.pipeline, <CUstream>c_stream, d_params.data.ptr, params.itemsize, <const OptixShaderBindingTable*>&sbt.sbt, c_dims[0], c_dims[1], c_dims[2]))

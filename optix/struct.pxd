@@ -1,4 +1,5 @@
 from .common cimport OptixResult
+from .base cimport OptixObject
 from .program_group cimport OptixProgramGroup, ProgramGroup
 
 
@@ -10,7 +11,7 @@ cdef extern from "optix_includes.h" nogil:
                                          void * sbtRecordHeaderHostPointer)
 
 
-cdef class _StructHelper(object):
+cdef class _StructHelper(OptixObject):
     cdef object dtype
     cdef dict array_values
     cdef object _array

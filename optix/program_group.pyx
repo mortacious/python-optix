@@ -14,7 +14,7 @@ class ProgramGroupKind(IntEnum):
     HITGROUP = OPTIX_PROGRAM_GROUP_KIND_HITGROUP,
     CALLABLES = OPTIX_PROGRAM_GROUP_KIND_CALLABLES
 
-cdef class ProgramGroup(OptixObject):
+cdef class ProgramGroup(OptixContextObject):
     def __init__(self,
                  DeviceContext context,
                  Module raygen_module=None,
@@ -46,21 +46,21 @@ cdef class ProgramGroup(OptixObject):
             desc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN
             if raygen_module is None:
                 raise ValueError("raygen entry function specified but no module given")
-            desc.raygen.module = raygen_module._module
+            desc.raygen.module = raygen_module.module
             tmp_entry_function_name_1 = raygen_entry_function_name.encode('ascii')
             desc.raygen.entryFunctionName = tmp_entry_function_name_1
         elif miss_entry_function_name is not None:
             desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS
             if miss_module is None:
                 raise ValueError("miss entry function specified but no module given")
-            desc.miss.module = miss_module._module
+            desc.miss.module = miss_module.module
             tmp_entry_function_name_1 = miss_entry_function_name.encode('ascii')
             desc.miss.entryFunctionName = tmp_entry_function_name_1
         elif exception_entry_function_name is not None:
             desc.kind = OPTIX_PROGRAM_GROUP_KIND_EXCEPTION
             if exception_module is None:
                 raise ValueError("exception entry function specified but no module given")
-            desc.exception.module = exception_module._module
+            desc.exception.module = exception_module.module
             tmp_entry_function_name_1 = exception_entry_function_name.encode('ascii')
             desc.exception.entryFunctionName = tmp_entry_function_name_1
         elif callables_entry_function_name_DC or callables_entry_function_name_CC:
@@ -69,14 +69,14 @@ cdef class ProgramGroup(OptixObject):
                 if callables_module_DC is None:
                     raise ValueError("callables DC entry function specified but no module given")
                 else:
-                    desc.callables.moduleDC = callables_module_DC._module
+                    desc.callables.moduleDC = callables_module_DC.module
                     tmp_entry_function_name_1 = callables_entry_function_name_DC.encode('ascii')
                     desc.callables.entryFunctionNameDC = tmp_entry_function_name_1
             if callables_entry_function_name_CC is not None:
                 if callables_module_CC is None:
                     raise ValueError("callables CC entry function specified but no module given")
                 else:
-                    desc.callables.moduleCC = callables_module_CC._module
+                    desc.callables.moduleCC = callables_module_CC.module
                     tmp_entry_function_name_2 = callables_entry_function_name_CC.encode('ascii')
                     desc.callables.entryFunctionNameCC = tmp_entry_function_name_2
         elif hitgroup_module_CH is not None or hitgroup_module_AH is not None or hitgroup_module_IS is not None:
@@ -85,7 +85,7 @@ cdef class ProgramGroup(OptixObject):
                 if hitgroup_module_CH is None:
                     raise ValueError("hitgroup CH entry function specified but no module given")
                 else:
-                    desc.hitgroup.moduleCH = hitgroup_module_CH._module
+                    desc.hitgroup.moduleCH = hitgroup_module_CH.module
                     tmp_entry_function_name_1 = hitgroup_entry_function_name_CH.encode('ascii')
                     desc.hitgroup.entryFunctionNameCH = tmp_entry_function_name_1
 
@@ -93,14 +93,14 @@ cdef class ProgramGroup(OptixObject):
                 if hitgroup_module_AH is None:
                     raise ValueError("hitgroup AH entry function specified but no module given")
                 else:
-                    desc.hitgroup.moduleAH = hitgroup_module_AH._module
+                    desc.hitgroup.moduleAH = hitgroup_module_AH.module
                     tmp_entry_function_name_2 = hitgroup_entry_function_name_AH.encode('ascii')
                     desc.hitgroup.entryFunctionNameAH = tmp_entry_function_name_2
             if hitgroup_entry_function_name_IS is not None:
                 if hitgroup_module_IS is None:
                     raise ValueError("hitgroup IS entry function specified but no module given")
                 else:
-                    desc.hitgroup.moduleIS = hitgroup_module_IS._module
+                    desc.hitgroup.moduleIS = hitgroup_module_IS.module
                     tmp_entry_function_name_3 = hitgroup_entry_function_name_IS.encode('ascii')
                     desc.hitgroup.entryFunctionNameIS = tmp_entry_function_name_3
 

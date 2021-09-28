@@ -24,48 +24,45 @@ class CompileDebugLevel(IntEnum):
     FULL = OPTIX_COMPILE_DEBUG_LEVEL_FULL
 
 
-cdef class ModuleCompileOptions:
+cdef class ModuleCompileOptions(OptixObject):
     DEFAULT_MAX_REGISTER_COUNT = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT
     def __init__(self,
                  max_register_count=OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT,
                  opt_level=CompileOptimizationLevel.DEFAULT,
                  debug_level= CompileDebugLevel.DEFAULT): #TODO add bound values
-        self._compile_options.maxRegisterCount = max_register_count
-        self._compile_options.optLevel = opt_level.value
-        self._compile_options.debugLevel = debug_level.value
-        self._compile_options.numBoundValues = 0
-        self._compile_options.boundValues = NULL # currently not supported
+        self.compile_options.maxRegisterCount = max_register_count
+        self.compile_options.optLevel = opt_level.value
+        self.compile_options.debugLevel = debug_level.value
+        self.compile_options.numBoundValues = 0
+        self.compile_options.boundValues = NULL # currently not supported
 
     @property
     def max_register_count(self):
-        return self._compile_options.maxRegisterCount
+        return self.compile_options.maxRegisterCount
 
     @max_register_count.setter
     def max_register_count(self, count):
-        self._compile_options.maxRegisterCount = count
+        self.compile_options.maxRegisterCount = count
 
     @property
     def opt_level(self):
-        return CompileOptimizationLevel(self._compile_options.optLevel)
+        return CompileOptimizationLevel(self.compile_options.optLevel)
 
     @opt_level.setter
     def opt_level(self, level):
-        self._compile_options.optLevel = level.value
+        self.compile_options.optLevel = level.value
 
     @property
     def debug_level(self):
-        return CompileDebugLevel(self._compile_options.debugLevel)
+        return CompileDebugLevel(self.compile_options.debugLevel)
 
     @debug_level.setter
     def debug_level(self, level):
-        self._compile_options.debugLevel = level.value
-
-    @property
-    def c_obj(self):
-        return <size_t>&self._compile_options
+        self.compile_options.debugLevel = level.value
 
 
 cdef tuple _nvrtc_compile_flags_default = ('-use_fast_math', '-lineinfo', '-default-device', '-std=c++11', '-rdc', 'true')
+
 
 cdef _is_ptx(src):
     if not isinstance(src, (bytes, bytearray)):
@@ -76,7 +73,8 @@ cdef _is_ptx(src):
             continue
         return line.startswith(b'.version')
 
-cdef class Module(OptixObject):
+
+cdef class Module(OptixContextObject):
     def __init__(self,
                  DeviceContext context,
                  src,
@@ -92,13 +90,13 @@ cdef class Module(OptixObject):
             ptx = src
         cdef const char* c_ptx = ptx
         optixModuleCreateFromPTX(self.context.c_context,
-                                 &(module_compile_options._compile_options),
-                                 &(pipeline_compile_options._compile_options),
+                                 &module_compile_options.compile_options,
+                                 &pipeline_compile_options.compile_options,
                                  c_ptx,
-                                 len(ptx)+1,
+                                 len(ptx) + 1,
                                  NULL,
                                  NULL,
-                                 &self._module)
+                                 &self.module)
 
     def _compile_cuda_ptx(self, src, name=None, **kwargs):
         if os.path.exists(src):
