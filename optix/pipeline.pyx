@@ -17,6 +17,9 @@ optix_init()
 
 
 class CompileDebugLevel(IntEnum):
+    """
+    Wraps the OptixCompileDebugLevel enum.
+    """
     DEFAULT = OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
     NONE = OPTIX_COMPILE_DEBUG_LEVEL_NONE,
     LINEINFO = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO,
@@ -24,6 +27,9 @@ class CompileDebugLevel(IntEnum):
 
 
 class ExceptionFlags(IntFlag):
+    """
+    Wraps the OptixExceptionFlags enum.
+    """
     NONE = OPTIX_EXCEPTION_FLAG_NONE,
     STACK_OVERFLOW = OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW,
     TRACE_DEPTH = OPTIX_EXCEPTION_FLAG_TRACE_DEPTH,
@@ -32,12 +38,18 @@ class ExceptionFlags(IntFlag):
 
 
 class TraversableGraphFlags(IntFlag):
+    """
+    Wraps the OptixTraversableGraphFlags enum.
+    """
     ALLOW_ANY = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY,
     ALLOW_SINGLE_GAS = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS,
     ALLOW_SINGLE_LEVEL_INSTANCING = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING
 
 
 class PrimitiveTypeFlags(IntFlag):
+    """
+    Wraps the OptixPrimitiveTypeFlags enum.
+    """
     DEFAULT = 0, # corresponds to CUSTOM | TRIANGLE
     CUSTOM = OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM,
     ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE,
@@ -47,6 +59,9 @@ class PrimitiveTypeFlags(IntFlag):
 
 
 cdef class PipelineCompileOptions(OptixObject):
+    """
+    Class wrapping the OptixPipelineCompileOptions struct.
+    """
     def __init__(self,
                  uses_motion_blur=False,
                  traversable_graph_flags = TraversableGraphFlags.ALLOW_ANY,
@@ -126,6 +141,9 @@ cdef class PipelineCompileOptions(OptixObject):
 
 
 cdef class PipelineLinkOptions(OptixObject):
+    """
+    Class wrapping the OptixPipelineLinkOptions struct.
+    """
     def __init__(self, unsigned int max_trace_depth = 1, debug_level = CompileDebugLevel.DEFAULT):
         self.link_options.maxTraceDepth = max_trace_depth
         self.link_options.debugLevel = debug_level.value
@@ -150,7 +168,29 @@ cdef class PipelineLinkOptions(OptixObject):
 ctypedef vector[unsigned int] uint_vector
 
 cdef class Pipeline(OptixContextObject):
-    def __init__(self, DeviceContext context, PipelineCompileOptions compile_options, PipelineLinkOptions link_options, program_groups, max_traversable_graph_depth=1):
+    """
+    The pipeline is the main entry point into a OptiX program. I combines several program groups containing different parts of the program
+    intro a single object that can be launched afterwards.
+
+    Parameters
+    ----------
+    context: DeviceContext
+        The context to use for this pipeline
+    compile_options: PipelineCompileOptions
+        Compile options of this pipeline
+    link_options: PipelineLinkOptions
+        Link options of this pipeline
+    program_groups: list[ProgramGroup] or single ProgramGroup
+        The program groups to use in this pipeline
+    max_traversable_graph_depth: int, optional
+        The maximum traversable graph depth in this pipeline. If omitted, a default value of 1 is used
+    """
+    def __init__(self,
+                 DeviceContext context,
+                 PipelineCompileOptions compile_options,
+                 PipelineLinkOptions link_options,
+                 program_groups,
+                 max_traversable_graph_depth=1):
         super().__init__(context)
         program_groups = ensure_iterable(program_groups)
 
@@ -182,6 +222,16 @@ cdef class Pipeline(OptixContextObject):
                           unsigned int direct_callable_stack_size_from_traversal,
                           unsigned int direct_callable_stack_size_from_state,
                           unsigned int continuation_stack_size):
+        """
+        Set the stack sizes manually. Usually this will not be used but one of the compute_stack_sizes functions.
+        
+        Parameters
+        ----------
+        direct_callable_stack_size_from_traversal: int
+        direct_callable_stack_size_from_state: int
+        continuation_stack_size: int
+        """
+
         optix_check_return(optixPipelineSetStackSize(self.pipeline,
                                                      direct_callable_stack_size_from_traversal,
                                                      direct_callable_stack_size_from_state,
@@ -192,6 +242,16 @@ cdef class Pipeline(OptixContextObject):
                               unsigned int max_trace_depth,
                               unsigned int max_cc_depth,
                               unsigned int max_dc_depth):
+        """
+        Compute the stack sizes using a conservative default algorithm. For documentation of the used algorithm refer to
+        the OptiX documentation at https://raytracing-docs.nvidia.com/optix7/guide/index.html#program_pipeline_creation#pipeline-stack-size.
+        
+        Parameters
+        ----------
+        max_trace_depth: int
+        max_cc_depth: int
+        max_dc_depth: int
+        """
         cdef unsigned int direct_callable_stack_size_from_traversal, direct_callable_stack_size_from_state, continuation_stack_size
         optix_check_return(optixUtilComputeStackSizes(&self._stack_sizes,
                                                       max_trace_depth,
@@ -207,6 +267,17 @@ cdef class Pipeline(OptixContextObject):
                                           unsigned int css_cc_tree,
                                           unsigned int max_trace_depth,
                                           unsigned int max_dc_depth):
+        """
+        Compute optimized stack sizes. Refer to the OptiX documentation at 
+        https://raytracing-docs.nvidia.com/optix7/guide/index.html#program_pipeline_creation#pipeline-stack-size
+        for details.
+        
+        Parameters
+        ----------
+        css_cc_tree: int
+        max_trace_depth: int
+        max_dc_depth: int
+        """
         cdef unsigned int direct_callable_stack_size_from_traversal, direct_callable_stack_size_from_state, continuation_stack_size
         optix_check_return(optixUtilComputeStackSizesCssCCTree(&self._stack_sizes,
                                                                css_cc_tree,
@@ -224,6 +295,20 @@ cdef class Pipeline(OptixContextObject):
                                        unsigned int max_cc_depth,
                                        unsigned int max_dc_depth_from_traversal,
                                        unsigned int max_dc_depth_from_state):
+        """
+        Compute optimized stack sizes. Refer to the OptiX documentation at 
+        https://raytracing-docs.nvidia.com/optix7/guide/index.html#program_pipeline_creation#pipeline-stack-size
+        for details.
+        
+        Parameters
+        ----------
+        dss_dc_from_traversal: int
+        dss_dc_from_state: int
+        max_trace_depth: int
+        max_cc_depth: int
+        max_dc_depth_from_traversal: int
+        max_dc_depth_from_state: int
+        """
         cdef unsigned int direct_callable_stack_size_from_traversal, direct_callable_stack_size_from_state, continuation_stack_size
         optix_check_return(optixUtilComputeStackSizesDCSplit(&self._stack_sizes,
                                                              dss_dc_from_traversal,
@@ -243,6 +328,24 @@ cdef class Pipeline(OptixContextObject):
                                                  object program_groups_closesthit_1,
                                                  ProgramGroup program_group_miss_2,
                                                  object program_groups_closesthit_2):
+        """
+        Compute optimized stack sizes for simple path tracers (camera and shadow rays). Refer to the OptiX documentation at 
+        https://raytracing-docs.nvidia.com/optix7/guide/index.html#program_pipeline_creation#pipeline-stack-size
+        for details.
+        
+        Parameters
+        ----------
+        program_group_raygen: ProgramGroup
+            The ProgramGroup containing the raygen program
+        program_group_miss_1: ProgramGroup 
+            The ProgramGroup invoked for the camera rays on miss
+        program_groups_closesthit_1: list[ProgramGroup]
+            The ProgramGroups invoked on closest hits of camera rays
+        program_group_miss_2: ProgramGroup
+            The ProgramGroup invoked for the shadow rays on miss
+        program_groups_closesthit_2: list[ProgramGroup]
+            The ProgramGroups invoked on closest hits of shadow rays
+        """
 
         cdef OptixProgramGroup* c_program_groups_closesthit[2]
         cdef bint must_free[2]
@@ -281,6 +384,22 @@ cdef class Pipeline(OptixContextObject):
             optix_check_return(optixPipelineDestroy(self.pipeline))
 
     def launch(self, ShaderBindingTable sbt, tuple dimensions, LaunchParamsRecord params=None, stream=None):
+        """
+        Launches the pipeline using the specified dimensions and Data structs.
+
+        Parameters
+        ----------
+        sbt: ShaderBindingTable
+            The ShaderbindingTable to use on this launch.
+        dimensions: tuple(3)
+            The launch dimensions. This has to be a tuple with a maximum of 3 elements specifying the x, y, and z dimensions
+            of the launch. If dimensions are omitted, they are assumed to be 1.
+        params: LaunchParamsRecord, optional
+            The launch params that will accessible under their configured name in the device code.
+        stream: cupy.cuda.Stream, optional
+            The cuda stream to use for the launch. If None the default stream (0) will be used.
+        """
+
         cdef uint_vector c_dims = uint_vector(3, 1)
         cdef int i
         for i in range(len(dimensions)):
@@ -291,4 +410,10 @@ cdef class Pipeline(OptixContextObject):
             c_stream = stream.ptr
 
         d_params = params.to_gpu(stream=stream)
-        optix_check_return(optixLaunch(self.pipeline, <CUstream>c_stream, d_params.data.ptr, params.itemsize, <const OptixShaderBindingTable*>&sbt.sbt, c_dims[0], c_dims[1], c_dims[2]))
+
+        cdef CUdeviceptr d_params_ptr = d_params.data.ptr
+        cdef size_t c_itemsize = params.itemsize
+        cdef const OptixShaderBindingTable* c_sbt = &sbt.sbt
+
+        with nogil:
+            optix_check_return(optixLaunch(self.pipeline, <CUstream>c_stream, d_params_ptr, c_itemsize, c_sbt, c_dims[0], c_dims[1], c_dims[2]))

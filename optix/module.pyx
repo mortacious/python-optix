@@ -6,10 +6,14 @@ from .path_utility import get_cuda_include_path, get_optix_include_path
 from .common cimport optix_check_return, optix_init
 from .context cimport DeviceContext
 from .pipeline cimport PipelineCompileOptions
+from .pipeline import CompileDebugLevel
 
 optix_init()
 
 class CompileOptimizationLevel(IntEnum):
+    """
+    Wraps the OptixCompileOptimizationLevel enum
+    """
     DEFAULT = OPTIX_COMPILE_OPTIMIZATION_DEFAULT,
     LEVEL_0 = OPTIX_COMPILE_OPTIMIZATION_LEVEL_0,
     LEVEL_1 = OPTIX_COMPILE_OPTIMIZATION_LEVEL_1,
@@ -17,14 +21,10 @@ class CompileOptimizationLevel(IntEnum):
     LEVEL_3 = OPTIX_COMPILE_OPTIMIZATION_LEVEL_3,
 
 
-class CompileDebugLevel(IntEnum):
-    DEFAULT = OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
-    NONE = OPTIX_COMPILE_DEBUG_LEVEL_NONE,
-    LINEINFO = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO,
-    FULL = OPTIX_COMPILE_DEBUG_LEVEL_FULL
-
-
 cdef class ModuleCompileOptions(OptixObject):
+    """
+    Wraps the OptixModuleCompileOptions struct.
+    """
     DEFAULT_MAX_REGISTER_COUNT = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT
     def __init__(self,
                  max_register_count=OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT,
@@ -75,6 +75,24 @@ cdef _is_ptx(src):
 
 
 cdef class Module(OptixContextObject):
+    """
+    Class representing a Optix Cuda program that will be called during pipeline execution. Wraps the OptixModule struct.
+
+    Parameters
+    ----------
+    context: DeviceContext
+        The context to use for this module
+    src: str
+        Either a string containing the module's source code or the path to a file containing it.
+    module_compile_options: ModuleCompileOptions
+        Compile options of this module
+    pipeline_compile_options: PipelineCompileOptions
+        Compile options of the pipeline the module will be used in
+    compile_flags: list[str], optional
+        List of compiler flags to use. If omitted, the default flags are used.
+    program_name: str, optional
+        The name the program is given internally. Of omitted either the filename is used if given or a default name is used.
+    """
     def __init__(self,
                  DeviceContext context,
                  src,
