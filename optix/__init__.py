@@ -1,4 +1,3 @@
-from .common import OptixException
 from .context import DeviceContext
 from .build import *
 from .module import Module, ModuleCompileOptions, CompileOptimizationLevel, CompileDebugLevel
