@@ -619,19 +619,19 @@ cdef class AccelerationStructure(OptixContextObject):
         if stream is not None:
             c_stream = stream.ptr
 
-        #TODO build acceleration structure without the gil
-        optix_check_return(optixAccelBuild(self.context.c_context,
-                                           <CUstream>c_stream,
-                                           accel_options.data(),
-                                           inputs.data(),
-                                           inputs_size,
-                                           tmp_gas_buffer_ptr,
-                                           self._buffer_sizes.tempSizeInBytes,
-                                           gas_buffer_ptr,
-                                           self._buffer_sizes.outputSizeInBytes,
-                                           &self._handle,
-                                          property_ptr,
-                                          num_properties))
+        with nogil:
+            optix_check_return(optixAccelBuild(self.context.c_context,
+                                               <CUstream>c_stream,
+                                               accel_options.data(),
+                                               inputs.data(),
+                                               inputs_size,
+                                               tmp_gas_buffer_ptr,
+                                               self._buffer_sizes.tempSizeInBytes,
+                                               gas_buffer_ptr,
+                                               self._buffer_sizes.outputSizeInBytes,
+                                               &self._handle,
+                                               property_ptr,
+                                               num_properties))
 
         cdef size_t compacted_gas_size = 0
 
@@ -685,19 +685,19 @@ cdef class AccelerationStructure(OptixContextObject):
         if stream is not None:
             c_stream = stream.ptr
 
-        #TODO update acceleration structure without the gil
-        optix_check_return(optixAccelBuild(self.context.c_context,
-                                           <CUstream> c_stream,
-                                           accel_options.data(),
-                                           inputs.data(),
-                                           inputs_size,
-                                           tmp_update_gas_buffer_ptr,
-                                           self._buffer_sizes.tempUpdateSizeInBytes,
-                                           gas_buffer_ptr,
-                                           self._buffer_sizes.outputSizeInBytes,
-                                           &self._handle,
-                                           NULL,
-                                           0))
+        with nogil:
+            optix_check_return(optixAccelBuild(self.context.c_context,
+                                               <CUstream> c_stream,
+                                               accel_options.data(),
+                                               inputs.data(),
+                                               inputs_size,
+                                               tmp_update_gas_buffer_ptr,
+                                               self._buffer_sizes.tempUpdateSizeInBytes,
+                                               gas_buffer_ptr,
+                                               self._buffer_sizes.outputSizeInBytes,
+                                               &self._handle,
+                                               NULL,
+                                               0))
 
     def __deepcopy__(self, memodict={}):
         """
