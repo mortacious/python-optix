@@ -52,7 +52,6 @@ def create_sbt(program_grps):
     raygen_grp, miss_grp, hit_grp = program_grps
 
     raygen_sbt = ox.SbtRecord(raygen_grp)
-    print("raygen", raygen_sbt)
     miss_sbt = ox.SbtRecord(miss_grp, names=('rgb',), formats=('3f4',))
     miss_sbt['rgb'] = [0.3, 0.1, 0.2]
 
@@ -113,7 +112,6 @@ if __name__ == "__main__":
 
     module = create_module(ctx, pipeline_options)
     program_grps = create_program_groups(ctx, module)
-    print(program_grps)
     pipeline = create_pipeline(ctx, program_grps, pipeline_options)
     sbt = create_sbt(program_grps)
     img = launch_pipeline(pipeline, sbt, gas)
