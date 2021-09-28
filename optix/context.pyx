@@ -22,7 +22,27 @@ cdef void context_log_cb(unsigned int level, const char * tag, const char * mess
 
 
 cdef class DeviceContext(OptixObject):
-    def __init__(self, object device=None, object log_callback_function=None, int32_t log_callback_level=1, bint validation_mode=False):
+    """
+    Represents an OptiX context on a single device. This class wraps the OptixDeviceContext struct.
+    This object will take a cupy Device instance to determine the Device to initialized OptiX on.
+
+    Parameters
+    ----------
+    device: cupy.cuda.Device
+        The cuda device to initialize the context on.
+    log_callback_function: callable, optional
+        Function to call for logging. If None logging will be disabled
+    log_callback_level: int
+        The log callback level. Please refer to the Logger Class for an explanation of the levels or consult the OptiX
+        documentation at https://raytracing-docs.nvidia.com/optix7/api/html/group__optix__types.html#gafa74ebb0b1ab57289a4d5a080cd4c090
+    validation_mode: bool
+        Enable or disable validation mode
+    """
+    def __init__(self,
+                 object device=None,
+                 object log_callback_function=None,
+                 int32_t log_callback_level=1,
+                 bint validation_mode=False):
         cdef OptixDeviceContextOptions options
         if device is None:
             device = cp.cuda.Device(0) # use the default (0) device
@@ -59,6 +79,14 @@ cdef class DeviceContext(OptixObject):
 
     @property
     def cache_database_sizes(self):
+        """
+        The sizes of the database
+
+        Returns
+        -------
+        low_water_mark: int
+        high_water_maks: int
+        """
         cdef size_t low_water_mark, high_water_mark
         optix_check_return(optixDeviceContextGetCacheDatabaseSizes(self.c_context, &low_water_mark, &high_water_mark))
         return low_water_mark, high_water_mark
@@ -71,6 +99,9 @@ cdef class DeviceContext(OptixObject):
 
     @property
     def cache_enabled(self):
+        """
+        Cache the modules after compilation
+        """
         cdef bint enabled
         optix_check_return(optixDeviceContextGetCacheEnabled(self.c_context, <int*>&enabled))
         return enabled
@@ -81,6 +112,9 @@ cdef class DeviceContext(OptixObject):
 
     @property
     def cache_location(self):
+        """
+        The location of the cache on the filesystem.
+        """
         cdef char[2048] location
         cdef bytes py_location
         optix_check_return(optixDeviceContextGetCacheLocation(self.c_context, location, 2048))
@@ -99,6 +133,9 @@ cdef class DeviceContext(OptixObject):
 
     @property
     def log_callback(self):
+        """
+        The callback function for logging
+        """
         return self._log_callback_function
 
     @log_callback.setter
@@ -109,6 +146,9 @@ cdef class DeviceContext(OptixObject):
 
     @property
     def log_callback_level(self):
+        """
+        The log callback level
+        """
         return self._log_callback_level
 
     @log_callback_level.setter
@@ -119,46 +159,78 @@ cdef class DeviceContext(OptixObject):
 
     @property
     def validation_mode(self):
+        """
+        """
         return self._validation_mode
 
     @property
     def max_trace_depth(self):
+        """
+        The maximum trace depth
+        """
         return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_TRACE_DEPTH)
 
     @property
     def max_traversable_graph_depth(self):
+        """
+        The maximum traversable graph depth
+        """
         return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_TRAVERSABLE_GRAPH_DEPTH)
 
     @property
     def max_primitives_per_gas(self):
+        """
+        The maximum number of primitives per geometry acceleration structure
+        """
         return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_PRIMITIVES_PER_GAS)
 
     @property
     def max_instances_per_ias(self):
+        """
+        The maximum number of instances per instance acceleration structure
+        """
         return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_INSTANCES_PER_IAS)
 
     @property
     def rtcore_version(self):
+        """
+        The version of rtcore
+        """
         return self._get_property(OPTIX_DEVICE_PROPERTY_RTCORE_VERSION)
 
     @property
     def max_instance_id(self):
+        """
+        The maximum instance id
+        """
         return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_INSTANCE_ID)
 
     @property
     def num_bits_instances_visibility_mask(self):
+        """
+        The number of bits in the visibility mask
+        """
         return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_NUM_BITS_INSTANCE_VISIBILITY_MASK)
 
     @property
     def max_sbt_records_per_gas(self):
+        """
+        The maximum number of records in the ShaderBindingTable per GAS
+        """
         return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_SBT_RECORDS_PER_GAS)
 
     @property
     def max_sbt_offset(self):
+        """
+        The maximum offset in the ShaderBindingTable
+        """
         return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_SBT_OFFSET)
 
     @property
     def device(self):
+        """
+        The device of this context
+        """
         return self._device
 
     def _repr_details(self):
