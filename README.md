@@ -1,6 +1,6 @@
 # Python-optix
 
-Python bindings for the OptiX 7 framework developed by Nvidia.
+Python bindings for the OptiX 7.3 framework developed by Nvidia.
 
 ## Installation
 

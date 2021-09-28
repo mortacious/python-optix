@@ -8,3 +8,6 @@ from .shader_binding_table import ShaderBindingTable
 from .pipeline import CompileDebugLevel, ExceptionFlags, TraversableGraphFlags, \
     PrimitiveTypeFlags, PipelineCompileOptions, PipelineLinkOptions, Pipeline
 
+
+from ._version import __version__
+

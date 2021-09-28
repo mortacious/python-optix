@@ -4,7 +4,8 @@ from Cython.Build import cythonize
 
 # standalone import of a module (https://stackoverflow.com/a/58423785)
 def import_module_from_path(path):
-    """Import a module from the given path."""
+    """Import a module from the given path without executing any code above it
+    """
     import importlib
     import pathlib
     import sys
@@ -33,9 +34,11 @@ extensions = [Extension("*", ["optix/*.pyx"], include_dirs=[cuda_include_path, o
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
+version = import_module_from_path('optix/_version.py').__version__
+
 setup(
     name="python-optix",
-    version="0.0.1",
+    version=version,
     author="Felix Igelbrink",
     author_email="felix.igelbrink@uni-osnabrueck.de",
     description="Python bindings to the optiX raytracing framework by nvidia",
