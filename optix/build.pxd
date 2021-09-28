@@ -246,7 +246,7 @@ cdef class BuildInputArray(OptixObject):
 
 
 cdef class BuildInputTriangleArray(BuildInputArray):
-    cdef OptixBuildInputTriangleArray _build_input
+    cdef OptixBuildInputTriangleArray build_input
     cdef list _d_vertex_buffers
     cdef vector[CUdeviceptr] _d_vertex_buffer_ptrs
     cdef object _d_index_buffer
@@ -256,7 +256,7 @@ cdef class BuildInputTriangleArray(BuildInputArray):
 
 
 cdef class BuildInputCustomPrimitiveArray(BuildInputArray):
-    cdef OptixBuildInputCustomPrimitiveArray _build_input
+    cdef OptixBuildInputCustomPrimitiveArray build_input
     cdef list _d_aabb_buffers
     cdef vector[CUdeviceptr] _d_aabb_buffer_ptrs
     cdef object _d_sbt_offset_buffer
@@ -265,7 +265,7 @@ cdef class BuildInputCustomPrimitiveArray(BuildInputArray):
 
 
 cdef class BuildInputCurveArray(BuildInputArray):
-    cdef OptixBuildInputCurveArray _build_input
+    cdef OptixBuildInputCurveArray build_input
     cdef list _d_vertex_buffers
     cdef vector[CUdeviceptr] _d_vertex_buffer_ptrs
     cdef list _d_width_buffers
@@ -276,12 +276,12 @@ cdef class BuildInputCurveArray(BuildInputArray):
 
 
 cdef class Instance(OptixObject):
-    cdef OptixInstance _instance
+    cdef OptixInstance instance
     cdef AccelerationStructure traversable
 
 
 cdef class BuildInputInstanceArray(BuildInputArray):
-    cdef OptixBuildInputInstanceArray _build_input
+    cdef OptixBuildInputInstanceArray build_input
     cdef object instances
     cdef object _d_instances
 
