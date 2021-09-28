@@ -5,7 +5,7 @@ from PIL import Image, ImageOps
 
 img_size = (1024, 768)
 
-
+# use a regular function for logging
 def log_callback(level, tag, msg):
     print("[{:>2}][{:>12}]: {}".format(level, tag, msg))
     pass
@@ -62,7 +62,6 @@ def create_sbt(program_grps):
 
 
 def launch_pipeline(pipeline : ox.Pipeline, sbt, gas):
-    pix_bytes = img_size[0] * img_size[1] * 4
 
     output_image = np.zeros(img_size + (4, ), 'B')
     output_image[:, :, :] = [255, 128, 0, 255]

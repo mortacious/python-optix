@@ -1,9 +1,9 @@
 #pragma once
 
 namespace sphere {
-    const unsigned int NUM_ATTRIBUTE_VALUES = 2u;
+    const unsigned int NUM_ATTRIBUTE_VALUES = 4u;
 
-    struct SpheresHitGroupData {
+    struct SphereHitGroupData {
         float3* centers;
         float* radii;
     };
@@ -11,15 +11,16 @@ namespace sphere {
 
 struct Params
 {
-    float3* points;
-    unsigned int* visible;
-    float3 ray_direction;
-    float tolerance;
+    uchar4*                image;
+    unsigned int           image_width;
+    unsigned int           image_height;
+    float3                 cam_eye;
+    float3                 cam_u, cam_v, cam_w;
     OptixTraversableHandle handle;
 };
 
 
 struct MissData
 {
-    float r, g, b;
+    float3 bg_color;
 };
