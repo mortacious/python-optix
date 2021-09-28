@@ -23,7 +23,7 @@ def import_module_from_path(path):
     return module
 
 
-util = import_module_from_path('optix/utility.py')
+util = import_module_from_path('optix/path_utility.py')
 cuda_include_path = util.get_cuda_include_path()
 optix_include_path = util.get_optix_include_path()
 if cuda_include_path is None or optix_include_path is None:

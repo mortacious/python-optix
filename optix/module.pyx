@@ -2,7 +2,7 @@
 
 from enum import IntEnum
 import os
-from .utility import get_cuda_include_path, get_optix_include_path
+from .path_utility import get_cuda_include_path, get_optix_include_path
 from .common cimport optix_check_return, optix_init
 from .context cimport DeviceContext
 from .pipeline cimport PipelineCompileOptions
