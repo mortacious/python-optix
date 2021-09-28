@@ -80,3 +80,4 @@ cdef extern from "optix_includes.h" nogil:
 
 cdef class ProgramGroup(OptixObject):
     cdef OptixProgramGroup _program_group
+    cdef OptixProgramGroupKind _kind

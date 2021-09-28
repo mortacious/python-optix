@@ -113,6 +113,9 @@ cdef class _StructHelper(object):
     def size(self):
         return self._array.shape[0]
 
+    def __repr__(self):
+        return f"<optix.{self.__class__.__name__}(size {self.size}, dtype {self.dtype})>"
+
 
 cdef class SbtRecord(_StructHelper):
     def __init__(self, ProgramGroup program_group, names=(), formats=(), size=1):

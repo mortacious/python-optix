@@ -1,7 +1,9 @@
-from .common cimport OptixResult
-from .context cimport OptixDeviceContext, DeviceContext
+from .common cimport OptixResult, CUstream, CUdeviceptr
+from .context cimport OptixDeviceContext
 from libcpp.vector cimport vector
 from .base cimport OptixObject
+from libc.stdint cimport uintptr_t
+
 
 cdef extern from "optix.h" nogil:
     # build functions and structs
@@ -45,7 +47,7 @@ cdef extern from "optix.h" nogil:
         OPTIX_BUILD_INPUT_TYPE_INSTANCE_POINTERS,
         OPTIX_BUILD_INPUT_TYPE_CURVES
 
-    ctypedef unsigned long long CUdeviceptr
+    #ctypedef uintptr_t CUdeviceptr
 
     cdef struct OptixBuildInputInstanceArray:
         CUdeviceptr instances
@@ -155,9 +157,7 @@ cdef extern from "optix.h" nogil:
         CUdeviceptr result
         OptixAccelPropertyType type
 
-    ctypedef size_t CUstream
-
-    ctypedef unsigned long long OptixTraversableHandle
+    ctypedef uintptr_t OptixTraversableHandle
 
     cdef struct OptixAccelRelocationInfo:
         unsigned long long info[4]

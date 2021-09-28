@@ -56,15 +56,6 @@ def get_cuda_path():
         cuda_path_default = os.path.normpath(
             os.path.join(os.path.dirname(nvcc_path), '..'))
 
-    #cuda_path = os.environ.get('CUDA_PATH', '')  # Nvidia default on Windows
-    #if len(cuda_path) > 0 and cuda_path != cuda_path_default:
-    #    print_warning(
-    #        'nvcc path != CUDA_PATH',
-    #        'nvcc path: %s' % cuda_path_default,
-    #        'CUDA_PATH: %s' % cuda_path)
-
-    #if os.path.exists(cuda_path):
-    #    _cuda_path = cuda_path
     if cuda_path_default is not None:
         _cuda_path = cuda_path_default
     elif os.path.exists('/usr/local/cuda'):

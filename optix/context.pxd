@@ -50,6 +50,7 @@ cdef class _LogWrapper:
 
 cdef class DeviceContext:
     cdef OptixDeviceContext c_context
+    cdef object _device
     cdef _LogWrapper _log_callback
     cdef unsigned int _log_callback_level
     cdef unsigned int _get_property(self, OptixDeviceProperty property)

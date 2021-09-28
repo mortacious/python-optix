@@ -22,25 +22,36 @@ cdef void context_log_cb(unsigned int level, const char * tag, const char * mess
 
 
 cdef class DeviceContext:
-    def __init__(self, object log_callback_function = None, int32_t log_callback_level = 1, bint validation_mode = False):
+    def __init__(self, object device=None, object log_callback_function=None, int32_t log_callback_level=1, bint validation_mode=False):
         cdef OptixDeviceContextOptions options
-        cp.cuda.runtime.free(0)
+        if device is None:
+            device = cp.cuda.Device(0) # use the default (0) device
 
-        if log_callback_function is not None:
-            self._log_callback = _LogWrapper(log_callback_function)
-            options.logCallbackFunction = context_log_cb
-            options.logCallbackData = <void*>self._log_callback # cast to pointer here and keep the python object stored in this class
+        if not isinstance(device, cp.cuda.Device):
+            raise TypeError(f"Device must be an instance of {cp.cuda.Device.__class__.__name__}")
 
-        self._log_callback_level = log_callback_level
-        options.logCallbackLevel = self._log_callback_level
-        self._validation_mode = validation_mode
-        options.validationMode = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL if validation_mode else OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_OFF
-        with nogil:
-            optix_check_return(optixDeviceContextCreate(<CUcontext>0, &options, &self.c_context))
+        self._device = device
+
+        with self._device:
+            self._device.synchronize() # make sure the device is initialized
+
+            if log_callback_function is not None:
+                self._log_callback = _LogWrapper(log_callback_function)
+                options.logCallbackFunction = context_log_cb
+                options.logCallbackData = <void*>self._log_callback # cast to pointer here and keep the python object stored in this class
+
+            self._log_callback_level = log_callback_level
+            options.logCallbackLevel = self._log_callback_level
+            self._validation_mode = validation_mode
+            options.validationMode = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL if validation_mode else OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_OFF
+            with nogil:
+                # use the current device's context
+                optix_check_return(optixDeviceContextCreate(<CUcontext>0, &options, &self.c_context))
 
     def __dealloc__(self):
         self._log_callback.enabled = False
-        optix_check_return(optixDeviceContextDestroy(self.c_context))
+        if <uintptr_t>self.c_context != 0:
+            optix_check_return(optixDeviceContextDestroy(self.c_context))
 
 
     def __eq__(self, DeviceContext other):
@@ -145,3 +156,10 @@ cdef class DeviceContext:
     @property
     def max_sbt_offset(self):
         return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_SBT_OFFSET)
+
+    @property
+    def device(self):
+        return self._device
+
+    def __repr__(self):
+        return f"<optix.{self.__class__.__name__}(device id {self._device.id})>"

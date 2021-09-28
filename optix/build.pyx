@@ -452,22 +452,22 @@ cdef class AccelerationStructure(OptixObject):
         gas_buffer_ptr = self._gas_buffer.ptr
         tmp_gas_buffer_ptr = d_tmp_gas_buffer.ptr
 
-        cdef size_t c_stream = 0
+        cdef uintptr_t c_stream = 0
 
         if stream is not None:
             c_stream = stream.ptr
 
         #TODO build acceleration structure without the gil
         optix_check_return(optixAccelBuild(self.context.c_context,
-                                          <CUstream>c_stream,
-                                          accel_options.data(),
-                                          inputs.data(),
-                                          inputs_size,
-                                          tmp_gas_buffer_ptr,
-                                          self._buffer_sizes.tempSizeInBytes,
-                                          gas_buffer_ptr,
-                                          self._buffer_sizes.outputSizeInBytes,
-                                          &self._handle,
+                                           <CUstream>c_stream,
+                                           accel_options.data(),
+                                           inputs.data(),
+                                           inputs_size,
+                                           tmp_gas_buffer_ptr,
+                                           self._buffer_sizes.tempSizeInBytes,
+                                           gas_buffer_ptr,
+                                           self._buffer_sizes.outputSizeInBytes,
+                                           &self._handle,
                                           property_ptr,
                                           num_properties))
 
@@ -507,7 +507,7 @@ cdef class AccelerationStructure(OptixObject):
         cdef CUdeviceptr gas_buffer_ptr
         gas_buffer_ptr = self._gas_buffer.ptr
 
-        cdef size_t c_stream = 0
+        cdef uintptr_t c_stream = 0
 
         if stream is not None:
             c_stream = stream.ptr
@@ -574,10 +574,10 @@ cdef class AccelerationStructure(OptixObject):
 
         result._handle = 0
 
-        cdef size_t c_stream = 0
+        cdef uintptr_t c_stream = 0
         cdef OptixTraversableHandle c_handle = 0
         optix_check_return(optixAccelRelocate(result.context.c_context,
-                                              <CUstream> c_stream,
+                                              <CUstream>c_stream,
                                               &gas_info,
                                               d_instances_ptr,
                                               c_instance_handles_size,
@@ -592,8 +592,8 @@ cdef class AccelerationStructure(OptixObject):
     def handle(self):
         return <OptixTraversableHandle>self._handle
 
-    def __repr__(self):
-        return f"<optix.{self.__class__.__name__}({self._num_elements} elements in {self._buffer_sizes.outputSizeInBytes} bytes)>"
+    def _repr_details(self):
+        return f"{self._num_elements} elements in {self._buffer_sizes.outputSizeInBytes} bytes"
 
 
 

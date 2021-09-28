@@ -34,7 +34,7 @@ cdef class ModuleCompileOptions:
         self._compile_options.optLevel = opt_level.value
         self._compile_options.debugLevel = debug_level.value
         self._compile_options.numBoundValues = 0
-        self._compile_options.boundValues = NULL
+        self._compile_options.boundValues = NULL # currently not supported
 
     @property
     def max_register_count(self):
@@ -112,8 +112,6 @@ cdef class Module(OptixObject):
         # TODO is there a public API for that?
         from cupy.cuda.compiler import _NVRTCProgram as NVRTCProgram
         prog = NVRTCProgram(src, name, **kwargs)
-        #from pynvrtc.compiler import Program
-        #prog = Program(src, name)
         flags = self._compile_flags
 
         # get cuda and optix_include_paths
@@ -122,9 +120,5 @@ cdef class Module(OptixObject):
 
         flags.extend([f'-I{cuda_include_path}', f'-I{optix_include_path}'])
         ptx, _ = prog.compile(flags)
-        #ptx = ptx.encode('ascii')
         return ptx
-
-    #cpdef size_t c_obj(self):
-    #    return <size_t>(<OptixModule>self._module)
 

@@ -4,8 +4,15 @@ from .common cimport optix_check_return, optix_init
 from .context cimport DeviceContext
 from .module cimport Module
 from libc.string cimport memset
-
+from enum import IntEnum
 optix_init()
+
+class ProgramGroupKind(IntEnum):
+    RAYGEN = OPTIX_PROGRAM_GROUP_KIND_RAYGEN,
+    MISS = OPTIX_PROGRAM_GROUP_KIND_MISS,
+    EXCEPTION = OPTIX_PROGRAM_GROUP_KIND_EXCEPTION,
+    HITGROUP = OPTIX_PROGRAM_GROUP_KIND_HITGROUP,
+    CALLABLES = OPTIX_PROGRAM_GROUP_KIND_CALLABLES
 
 cdef class ProgramGroup(OptixObject):
     def __init__(self,
@@ -97,6 +104,7 @@ cdef class ProgramGroup(OptixObject):
                     tmp_entry_function_name_3 = hitgroup_entry_function_name_IS.encode('ascii')
                     desc.hitgroup.entryFunctionNameIS = tmp_entry_function_name_3
 
+        self._kind = desc.kind
         cdef OptixProgramGroupOptions options # init to zero
         memset(&options, 0, sizeof(options))
         optix_check_return(optixProgramGroupCreate(self.context.c_context, &desc, 1, &options, NULL, NULL, &self._program_group))
@@ -161,3 +169,6 @@ cdef class ProgramGroup(OptixObject):
         cdef OptixStackSizes stack_sizes
         optix_check_return(optixProgramGroupGetStackSize(self._program_group, &stack_sizes))
         return stack_sizes.cssRG, stack_sizes.cssMS, stack_sizes.cssCH, stack_sizes.cssAH, stack_sizes.cssIS, stack_sizes.cssCC, stack_sizes.dssDC
+
+    def _repr_details(self):
+        return f"kind {ProgramGroupKind(self._kind).name}"

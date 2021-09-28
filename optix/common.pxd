@@ -21,9 +21,9 @@ cdef extern from "optix_includes.h" nogil:
     cdef const char* optixGetErrorName(OptixResult result)
     cdef const char* optixGetErrorString(OptixResult result)
 
-    ctypedef size_t CUstream
+    ctypedef uintptr_t CUstream
 
-    ctypedef unsigned long long CUdeviceptr
+    ctypedef uintptr_t CUdeviceptr
 
     cdef void optix_check_return(OptixResult result) except+
 

@@ -5,8 +5,10 @@ from .common import ensure_iterable
 from .context cimport DeviceContext
 from .program_group cimport OptixProgramGroup, OptixProgramGroupOptions, optixProgramGroupCreate, OptixProgramGroupDesc
 from enum import IntEnum, IntFlag
-from libcpp.vector cimport vector
 from libc.stdlib cimport malloc, free
+from libcpp.vector cimport vector
+from libc.stdint cimport uintptr_t
+
 from .struct cimport LaunchParamsRecord
 from .struct import LaunchParamsRecord
 from .shader_binding_table cimport ShaderBindingTable
@@ -244,6 +246,7 @@ cdef class Pipeline(OptixObject):
                                                  object program_groups_closesthit_1,
                                                  ProgramGroup program_group_miss_2,
                                                  object program_groups_closesthit_2):
+
         cdef OptixProgramGroup* c_program_groups_closesthit[2]
         cdef bint must_free[2]
         cdef i
@@ -277,12 +280,8 @@ cdef class Pipeline(OptixObject):
                     free(c_program_groups_closesthit[i])
 
     def __dealloc__(self):
-        if <size_t>self._pipeline != 0:
+        if <uintptr_t>self._pipeline != 0:
             optix_check_return(optixPipelineDestroy(self._pipeline))
-
-    @property
-    def c_obj(self):
-        return <size_t>&self._pipeline
 
     def launch(self, ShaderBindingTable sbt, tuple dimensions, LaunchParamsRecord params=None, stream=None):
         cdef uint_vector c_dims = uint_vector(3, 1)
@@ -295,4 +294,4 @@ cdef class Pipeline(OptixObject):
             c_stream = stream.ptr
 
         d_params = params.to_gpu(stream=stream)
-        optix_check_return(optixLaunch(self._pipeline, <CUstream>c_stream, d_params.data.ptr, params.itemsize, <const OptixShaderBindingTable*>sbt.c_obj(), c_dims[0], c_dims[1], c_dims[2]))
+        optix_check_return(optixLaunch(self._pipeline, <CUstream>c_stream, d_params.data.ptr, params.itemsize, <const OptixShaderBindingTable*>&sbt.sbt, c_dims[0], c_dims[1], c_dims[2]))

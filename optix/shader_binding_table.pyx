@@ -25,34 +25,34 @@ cdef class ShaderBindingTable:
                  ):
         if raygen_record is not None:
             self._d_raygen_record, _, _ = self._process_record(raygen_record, None, None, stream)
-            self._shader_binding_table.raygenRecord = self._d_raygen_record.ptr
+            self.sbt.raygenRecord = self._d_raygen_record.ptr
 
         if exception_record is not None:
             self._d_exception_record, _, _ = self._process_record(exception_record, None, None, stream)
-            self._shader_binding_table.exceptionRecord = self._d_exception_record.ptr
+            self.sbt.exceptionRecord = self._d_exception_record.ptr
 
         if miss_records is not None:
-            self._d_miss_records, self._shader_binding_table.missRecordCount, self._shader_binding_table.missRecordStrideInBytes = self._process_record(miss_records,
-                                                                                                                                                        miss_records_count,
-                                                                                                                                                        miss_records_stride,
-                                                                                                                                                        stream)
-            self._shader_binding_table.missRecordBase = self._d_miss_records.ptr
+            self._d_miss_records, self.sbt.missRecordCount, self.sbt.missRecordStrideInBytes = self._process_record(miss_records,
+                                                                                                                    miss_records_count,
+                                                                                                                    miss_records_stride,
+                                                                                                                    stream)
+            self.sbt.missRecordBase = self._d_miss_records.ptr
 
 
         if hitgroup_records is not None:
-            self._d_hitgroup_records, self._shader_binding_table.hitgroupRecordCount, self._shader_binding_table.hitgroupRecordStrideInBytes = self._process_record(hitgroup_records,
-                                                                                                                                                                    hitgroup_records_count,
-                                                                                                                                                                    hitgroup_records_stride,
-                                                                                                                                                                    stream)
+            self._d_hitgroup_records, self.sbt.hitgroupRecordCount, self.sbt.hitgroupRecordStrideInBytes = self._process_record(hitgroup_records,
+                                                                                                                                hitgroup_records_count,
+                                                                                                                                hitgroup_records_stride,
+                                                                                                                                stream)
 
-            self._shader_binding_table.hitgroupRecordBase = self._d_hitgroup_records.ptr
+            self.sbt.hitgroupRecordBase = self._d_hitgroup_records.ptr
 
         if callables_records is not None:
-            self._d_callables_records, self._shader_binding_table.callablesRecordCount, self._shader_binding_table.callablesRecordStrideInBytes = self._process_record(callables_records,
-                                                                                                                                                                       callables_records_count,
-                                                                                                                                                                       callables_records_strides,
-                                                                                                                                                                       stream)
-            self._shader_binding_table.callablesRecordBase = self._d_callables_records.ptr
+            self._d_callables_records, self.sbt.callablesRecordCount, self.sbt.callablesRecordStrideInBytes = self._process_record(callables_records,
+                                                                                                                                   callables_records_count,
+                                                                                                                                   callables_records_strides,
+                                                                                                                                   stream)
+            self.sbt.callablesRecordBase = self._d_callables_records.ptr
 
     def _process_record(self, record, count, strides, stream=None):
         if isinstance(record, SbtRecord):
@@ -69,7 +69,4 @@ cdef class ShaderBindingTable:
             return array_to_device_memory(record, stream=stream), record.shape[0], record.strides[0]
         else:
             raise ValueError(f"Unsupported record type '{type(record)}'")
-
-    cpdef size_t c_obj(self):
-        return <size_t>&self._shader_binding_table
 

@@ -52,7 +52,7 @@ def create_sbt(program_grps):
     raygen_grp, miss_grp, hit_grp = program_grps
 
     raygen_sbt = ox.SbtRecord(raygen_grp)
-
+    print("raygen", raygen_sbt)
     miss_sbt = ox.SbtRecord(miss_grp, names=('rgb',), formats=('3f4',))
     miss_sbt['rgb'] = [0.3, 0.1, 0.2]
 
@@ -101,12 +101,10 @@ def launch_pipeline(pipeline : ox.Pipeline, sbt, gas):
 
 if __name__ == "__main__":
     ctx = ox.DeviceContext(validation_mode=True, log_callback_function=log_callback, log_callback_level=3)
-
     vertices = cp.array([[-0.5, -0.5, 0.0],
                          [ 0.5, -0.5, 0.0],
                          [ 0.0,  0.5, 0.0]], dtype=np.float32)
     gas = create_acceleration_structure(ctx, vertices)
-
     pipeline_options = ox.PipelineCompileOptions(traversable_graph_flags=ox.TraversableGraphFlags.ALLOW_SINGLE_GAS,
                                                  num_payload_values=3,
                                                  num_attribute_values=3,
@@ -115,6 +113,7 @@ if __name__ == "__main__":
 
     module = create_module(ctx, pipeline_options)
     program_grps = create_program_groups(ctx, module)
+    print(program_grps)
     pipeline = create_pipeline(ctx, program_grps, pipeline_options)
     sbt = create_sbt(program_grps)
     img = launch_pipeline(pipeline, sbt, gas)
