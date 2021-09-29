@@ -54,7 +54,7 @@ SBT_RECORD_ALIGNMENT = OPTIX_SBT_RECORD_ALIGNMENT
 SBT_RECORD_HEADER_SIZE = OPTIX_SBT_RECORD_HEADER_SIZE
 
 
-cdef class _StructHelper(Mapping):
+cdef class _StructHelper:
     """
     Helper class to create and manage a struct on the GPU. This class will construct a
     numpy structured array using the names and formats provided and transfer it to the GPU on demand.
@@ -200,6 +200,15 @@ cdef class _StructHelper(Mapping):
 
     def __iter__(self):
         yield from self.keys()
+
+    def __contains__(self, item):
+        return item in self.dtype.fields
+
+    def get(self, item, value=None):
+        try:
+            return self.array[item]
+        except KeyError:
+            return value
 
     def keys(self):
         yield from self.dtype.fields
