@@ -53,7 +53,7 @@ setup(
         'numpy',
         'cupy>=9.0'
     ],
-    license="TBD",
+    license="MIT",
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
