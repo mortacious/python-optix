@@ -8,6 +8,9 @@ from enum import IntEnum
 optix_init()
 
 class ProgramGroupKind(IntEnum):
+    """
+    Wraps the OptixProgramGroupKind enum
+    """
     RAYGEN = OPTIX_PROGRAM_GROUP_KIND_RAYGEN,
     MISS = OPTIX_PROGRAM_GROUP_KIND_MISS,
     EXCEPTION = OPTIX_PROGRAM_GROUP_KIND_EXCEPTION,
@@ -15,6 +18,58 @@ class ProgramGroupKind(IntEnum):
     CALLABLES = OPTIX_PROGRAM_GROUP_KIND_CALLABLES
 
 cdef class ProgramGroup(OptixContextObject):
+    """
+    Represets a Programgroup, containing the entry functions and their module for one specific part
+    of the pipeline (raygen, miss, exceptin, hitgroup and callables).
+
+    One ProgramGroup can only represent a single part with multiple functions if necessary so the creation functions provided
+    below are preferred over the generic __init__ function.
+
+    Parameters
+    ----------
+    context: DeviceContext
+        The context to use for this ProgramGroup.
+    raygen_module: Module, optional
+        The module containing the raygen function or None.
+    raygen_entry_function_name: str, optional
+        The name of the raygen function in the raygen module above. If this is not None the parameter raygen_module must
+        also be present.
+    miss_module: Module, optional
+        The module containing the miss function or None.
+    miss_entry_function_name: str, optional
+        The name of the miss function in the miss module above. If this is not None the parameter miss_module must
+        also be present.
+    exception_module: Module, optional
+        The module containing the exception function or None.
+    exception_entry_function_name: str, optional
+        The name of the exception function in the exception module above. If this is not None the parameter exception_module must
+        also be present.
+    callables_module_DC: Module, optional
+        The module containing the direct callable (DC) function or None.
+    callables_entry_function_name_DC: str, optional
+        The name of the direct callable (DC) function in the callables_module_DC module above. If this is not None the parameter callables_module_DC must
+        also be present.
+    callables_module_CC: Module, optional
+        The module containing the continuation callable (CC) function or None.
+    callables_entry_function_name_CC: str, optional
+        The name of the continuation callable (CC) function in the callables_module_CC module above. If this is not None the parameter callables_module_CC must
+        also be present.
+    hitgroup_module_CH: Module, optional
+        The module containing the closest hit (CH) function or None.
+    hitgroup_entry_function_name_CH: str, optional
+        The name of the closest hit (CH) function in the hitgroup_module_CH module above. If this is not None the parameter hitgroup_module_CH must
+        also be present.
+    hitgroup_module_AH: Module, optional
+        The module containing the any hit (AH) function or None.
+    hitgroup_entry_function_name_AH: str, optional
+        The name of the any hit (AH) function in the hitgroup_module_AH module above. If this is not None the parameter hitgroup_module_AH must
+        also be present.
+    hitgroup_module_IS: Module, optional
+        The module containing the intersection (IS) function or None.
+    hitgroup_entry_function_name_IS: str, optional
+        The name of the intersection (IH) function in the hitgroup_module_IS module above. If this is not None the parameter hitgroup_module_IS must
+        also be present.
+    """
     def __init__(self,
                  DeviceContext context,
                  Module raygen_module=None,
@@ -115,24 +170,106 @@ cdef class ProgramGroup(OptixContextObject):
 
     @classmethod
     def create_raygen(cls, DeviceContext context, Module module, str entry_function_name):
+        """
+        Create a raygen ProgramGroup.
+
+        Parameters
+        ----------
+        context: DeviceContext
+            The context to use for this ProgramGroup.
+        module: Module
+            The module containig the raygen function.
+        entry_function_name: str
+            The name of the raygen function in the module.
+
+        Returns
+        -------
+        program_group: ProgramGroup
+            The created raygen ProgramGroup.
+        """
         return cls(context, raygen_module=module, raygen_entry_function_name=entry_function_name)
 
     @classmethod
     def create_miss(cls, DeviceContext context, Module module, str entry_function_name):
+        """
+        Create a miss ProgramGroup.
+
+        Parameters
+        ----------
+        context: DeviceContext
+            The context to use for this ProgramGroup.
+        module: Module
+            The module containig the miss function.
+        entry_function_name: str
+            The name of the miss function in the module.
+
+        Returns
+        -------
+        program_group: ProgramGroup
+            The created miss ProgramGroup.
+        """
         return cls(context, miss_module=module, miss_entry_function_name=entry_function_name)
 
     @classmethod
     def create_exception(cls, DeviceContext context, Module module, str entry_function_name):
+        """
+        Create a exception ProgramGroup.
+
+        Parameters
+        ----------
+        context: DeviceContext
+            The context to use for this ProgramGroup.
+        module: Module
+            The module containig the exception function.
+        entry_function_name: str
+            The name of the exception function in the module.
+
+        Returns
+        -------
+        program_group: ProgramGroup
+            The created exception ProgramGroup.
+        """
         return cls(context, exception_module=module, exception_entry_function_name=entry_function_name)
 
     @classmethod
-    def create_callables(cls, DeviceContext context, Module module_DC=None, str entry_function_DC=None, Module module_CC=None, str entry_function_CC=None, share_module=True):
+    def create_callables(cls,
+                         DeviceContext context,
+                         Module module=None,
+                         Module module_DC=None,
+                         str entry_function_DC=None,
+                         Module module_CC=None,
+                         str entry_function_CC=None):
+        """
+        Create a callables ProgramGroup.
+
+        Parameters
+        ----------
+        context: DeviceContext
+            The context to use for this ProgramGroup.
+        module: Module, optional
+            The module to use for both the direct callables (DC) and continuation callables (CC) functions. If this is None,
+            the parameters module_DC and module_CC must be specified if their functions are used.
+        module_DC: Module, optional
+            The module to use for the direct callables (DC) function.
+        entry_function_DC: str, optional
+            The name of the direct callables (DC) function in the module. If this is not None the module_DC parameter
+            is also expected to be present.
+        module_CC: Module, optional
+            The module to use for the continuation callables (CC) function.
+        entry_function_CC: str, optional
+            The name of the continuation callables (CC) function in the module. If this is not None the module_CC parameter
+            is also expected to be present.
+
+        Returns
+        -------
+        program_group: ProgramGroup
+            The created callables ProgramGroup.
+        """
+
         # implicitly reuse the module
-        if share_module:
-            if module_CC is None and module_DC is not None:
-                module_CC = module_DC
-            elif module_DC is None and module_CC is not None:
-                module_DC = module_CC
+        if module is not None:
+            module_DC = module
+            module_CC = module
 
         return cls(context,
                    callables_module_DC=module_DC,
@@ -143,19 +280,48 @@ cdef class ProgramGroup(OptixContextObject):
     @classmethod
     def create_hitgroup(cls,
                         DeviceContext context,
+                        Module module=None,
                         Module module_CH=None,
                         str entry_function_CH=None,
                         Module module_AH=None,
                         str entry_function_AH=None,
                         Module module_IS=None,
-                        str entry_function_IS=None,
-                        share_module=True):
-        if share_module:
-            for module in [module_CH, module_AH, module_IS]:
-                if module is not None:
-                    module_CH = module
-                    module_AH = module
-                    module_IS = module
+                        str entry_function_IS=None):
+        """
+        Create a hitgroup ProgramGroup.
+
+        Parameters
+        ----------
+        context: DeviceContext
+            The context to use for this ProgramGroup.
+        module: Module, optional
+            The module to use for all hitgroup functions (closest hit, any hit and intersection). If this is None,
+            the parameters module_CH, module_AH and module_IS must be specified if their functions are used.
+        module_CH: Module, optional
+            The module to use for the closest hit (CH) function.
+        entry_function_CH: str, optional
+            The name of the closest hit (CH) function in the module. If this is not None the module_CH parameter
+            is also expected to be present.
+        module_AH: Module, optional
+            The module to use for the any hit (AH) function.
+        entry_function_AH: str, optional
+            The name of the any hit (AH) function in the module. If this is not None the module_AH parameter
+            is also expected to be present.
+        module_IS: Module, optional
+            The module to use for the intersection (IS) function.
+        entry_function_IS: str, optional
+            The name of the intersection (IS) function in the module. If this is not None the module_IS parameter
+            is also expected to be present.
+
+        Returns
+        -------
+        program_group: ProgramGroup
+            The created hitgroup ProgramGroup.
+        """
+        if module is not None:
+            module_CH = module
+            module_AH = module
+            module_IS = module
         return cls(context,
                    hitgroup_module_CH=module_CH,
                    hitgroup_entry_function_name_CH=entry_function_CH,
@@ -166,6 +332,26 @@ cdef class ProgramGroup(OptixContextObject):
 
     @property
     def stack_sizes(self):
+        """
+        Returns the stack sizes of this ProgramGroup
+
+        Returns
+        -------
+        cssRG: int
+           Continuation stack size of raygen (RG) programs in bytes.
+        cssMS: int
+           Continuation stack size of miss (MS) programs in bytes.
+        cssCH: int
+            Continuation stack size of closest hit (CH) programs in bytes.
+        cssAH: int
+            Continuation stack size of any hit (AH) programs in bytes.
+        cssIS: int
+            Continuation stack size of intersection (IS) programs in bytes.
+        cssSS: int
+            Continuation stack size of continuation callables (CC) programs in bytes.
+        dssDC: int
+            Direct stack size of direct callables (DC) programs in bytes.
+        """
         cdef OptixStackSizes stack_sizes
         optix_check_return(optixProgramGroupGetStackSize(self._program_group, &stack_sizes))
         return stack_sizes.cssRG, stack_sizes.cssMS, stack_sizes.cssCH, stack_sizes.cssAH, stack_sizes.cssIS, stack_sizes.cssCC, stack_sizes.dssDC
