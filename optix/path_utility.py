@@ -39,7 +39,7 @@ def get_path(key):
 
 
 def search_on_path(filenames, keys=('PATH',)):
-    for p in chain(get_path(key) for key in keys):
+    for p in chain(*[get_path(key) for key in keys]):
         for filename in filenames:
             full = os.path.abspath(os.path.join(p, filename))
             if os.path.exists(full):
