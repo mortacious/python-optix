@@ -9,6 +9,48 @@ import numpy as np
 optix_init()
 
 cdef class ShaderBindingTable(OptixObject):
+    """
+    Represents a ShaderBindingTable, containing data used by the various programs in the OptiX Pipeline.
+    This wraps the OptixShaderBindingTable struct. All data given is automatically transferred to the gpu on object creation.
+
+    The records in the ShaderBindingTable usually correspond to a C-struct defined in device code. As python does not have access to the struct defintiion, the
+    correctness of the data will not be checked.
+
+    Parameters
+    ----------
+    stream: cupy.cuda.Stream, optional
+        The stream to use to transfer the data to the GPU.
+    raygen_record: SbtRecord, numpy.ndarray or cupy.Memorypointer, optional
+        The data to write into the raygen record of the ShaderBindingTable. Note, that only a single Record (e.g. a numpy array of length 1)
+        is allowed here.
+    exception_record: SbtRecord, numpy.ndarray or cupy.Memorypointer, optional
+        The data to write into the exception record of the ShaderBindingTable. Note, that only a single Record (e.g. a numpy array of length 1)
+        is allowed here.
+    miss_records: SbtRecord, numpy.ndarray or cupy.Memorypointer, optional
+        Data to write into the miss records of the ShaderBindingTable. The length of the passed array determines the number of records written.
+    miss_records_count: int, optional
+        Number of records if they cannot be determined from the record object (in case of a cupy.Memorypointer). In all other cases this parameter
+        is ignored.
+    miss_records_stride: int, optional
+        The stride of the records (size of one Record in bytes) if they cannot be determined from the record object (in case of a cupy.Memorypointer).
+        In all other cases this parameter is ignored.
+    hitgroup_records: SbtRecord, numpy.ndarray or cupy.Memorypointer, optional
+        Data to write into the hitgroup records of the ShaderBindingTable. The length of the passed array determines the number of records written.
+    hitgroup_records_count: int, optional
+        Number of records if they cannot be determined from the record object (in case of a cupy.Memorypointer). In all other cases this parameter
+        is ignored.
+    hitgroup_records_stride: int, optional
+        The stride of the records (size of one Record in bytes) if they cannot be determined from the record object (in case of a cupy.Memorypointer).
+        In all other cases this parameter is ignored.
+    callables_records: SbtRecord, numpy.ndarray or cupy.Memorypointer, optional
+        Data to write into the miss records of the ShaderBindingTable. The length of the passed array determines the number of records written.
+    callables_records_count: int, optional
+        Number of records if they cannot be determined from the record object (in case of a cupy.Memorypointer). In all other cases this parameter
+        is ignored.
+    callables_records_strides: int, optional
+        The stride of the records (size of one Record in bytes) if they cannot be determined from the record object (in case of a cupy.Memorypointer).
+        In all other cases this parameter is ignored.
+    """
     def __init__(self,
                  stream=None,
                  raygen_record=None,

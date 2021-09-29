@@ -203,7 +203,7 @@ cdef class Pipeline(OptixContextObject):
         cdef ProgramGroup grp
         for i in range(num_program_groups):
             grp = <ProgramGroup>program_groups[i]
-            c_program_groups[i] = grp._program_group
+            c_program_groups[i] = grp.program_group
 
         for i in range(len(program_groups)):
             optix_check_return(optixUtilAccumulateStackSizes(c_program_groups[i], &self._stack_sizes))
@@ -356,18 +356,18 @@ cdef class Pipeline(OptixContextObject):
                 c_program_groups_closesthit[j] = <OptixProgramGroup*>malloc(size * sizeof(OptixProgramGroup))
                 must_free[j] = True
                 for i in range(size):
-                    c_program_groups_closesthit[j][i] = (<ProgramGroup>ch_group[i])._program_group
+                    c_program_groups_closesthit[j][i] = (<ProgramGroup>ch_group[i]).program_group
             else:
-                c_program_groups_closesthit[j][i] = (<ProgramGroup>ch_group)._program_group
+                c_program_groups_closesthit[j][i] = (<ProgramGroup>ch_group).program_group
                 must_free[j] = False
 
         cdef unsigned int direct_callable_stack_size_from_traversal = 0, direct_callable_stack_size_from_state = 0, continuation_stack_size = 0
         try:
-            optix_check_return(optixUtilComputeStackSizesSimplePathTracer(program_group_raygen._program_group,
-                                                                          program_group_miss_1._program_group,
+            optix_check_return(optixUtilComputeStackSizesSimplePathTracer(program_group_raygen.program_group,
+                                                                          program_group_miss_1.program_group,
                                                                           c_program_groups_closesthit[0],
                                                                           len(program_groups_closesthit_1),
-                                                                          program_group_miss_2._program_group,
+                                                                          program_group_miss_2.program_group,
                                                                           c_program_groups_closesthit[1],
                                                                           len(program_groups_closesthit_2),
                                                                           &direct_callable_stack_size_from_traversal,
