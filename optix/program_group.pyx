@@ -162,11 +162,11 @@ cdef class ProgramGroup(OptixContextObject):
         self._kind = desc.kind
         cdef OptixProgramGroupOptions options # init to zero
         memset(&options, 0, sizeof(options))
-        optix_check_return(optixProgramGroupCreate(self.context.c_context, &desc, 1, &options, NULL, NULL, &self._program_group))
+        optix_check_return(optixProgramGroupCreate(self.context.c_context, &desc, 1, &options, NULL, NULL, &self.program_group))
 
     def __dealloc__(self):
-        if <size_t>self._program_group != 0:
-            optix_check_return(optixProgramGroupDestroy(self._program_group))
+        if <size_t>self.program_group != 0:
+            optix_check_return(optixProgramGroupDestroy(self.program_group))
 
     @classmethod
     def create_raygen(cls, DeviceContext context, Module module, str entry_function_name):
@@ -353,8 +353,12 @@ cdef class ProgramGroup(OptixContextObject):
             Direct stack size of direct callables (DC) programs in bytes.
         """
         cdef OptixStackSizes stack_sizes
-        optix_check_return(optixProgramGroupGetStackSize(self._program_group, &stack_sizes))
+        optix_check_return(optixProgramGroupGetStackSize(self.program_group, &stack_sizes))
         return stack_sizes.cssRG, stack_sizes.cssMS, stack_sizes.cssCH, stack_sizes.cssAH, stack_sizes.cssIS, stack_sizes.cssCC, stack_sizes.dssDC
 
     def _repr_details(self):
         return f"kind {ProgramGroupKind(self._kind).name}"
+
+    @property
+    def kind(self):
+        return self._kind
