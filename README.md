@@ -1,9 +1,10 @@
 # Python-OptiX
 
-Python wrapper for the OptiX 7.3 ray tracing engine by Nvidia.
+Python wrapper for the OptiX 7.3 raytracing engine by Nvidia.
 
 Python-OptiX wraps the OptiX C++ API using Cython and provides a simplified 
-interface to the original C-like API using the [CuPy](https://cupy.dev) module.
+interface to the original C-like API using mainly the 
+[CuPy](https://cupy.dev) package.
 
 ### Supported Platforms
 
@@ -22,7 +23,7 @@ and the [OptiX 7.3.0 SDK](https://developer.nvidia.com/optix/downloads/7.3.0/lin
 
 Make sure the CUDA header files are installed as well
 
-*Note*: Add the locations of CUDA and OptiX to the system PATH variable if necessary.
+Add the locations of CUDA and OptiX to the system `PATH` variable if necessary.
 
 ### Using pip
 ```

@@ -1,4 +1,4 @@
-from setuptools import setup, Extension
+from setuptools import setup, Extension, find_packages
 from Cython.Build import cythonize
 
 
@@ -30,6 +30,7 @@ if cuda_include_path is None or optix_include_path is None:
     raise RuntimeError("Cuda or optix not found in the system")
 
 extensions = [Extension("*", ["optix/*.pyx"], include_dirs=[cuda_include_path, optix_include_path])]
+extensions = cythonize(extensions, language_level="3")
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -41,26 +42,35 @@ setup(
     version=version,
     author="Felix Igelbrink",
     author_email="felix.igelbrink@uni-osnabrueck.de",
-    description="Python bindings to the optiX raytracing framework by nvidia",
+    description="Python bindings to the OptiX raytracing engine by nvidia",
     long_description=long_description,
-    long_descriptiopn_content_type="text/markdown",
+    long_description_content_type="text/markdown",
     url="https://github.com/mortacious/python-optix",
     project_urls={
         "Bug Tracker": "https://github.com/mortacious/python-optix/issues",
     },
-    ext_modules=cythonize(extensions, language_level="3"),
+    packages=find_packages(exclude=['tests', 'examples']),
+    ext_modules=extensions,
     install_requires=[
         'numpy',
         'cupy>=9.0'
     ],
     license="MIT",
     classifiers=[
-        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
         "License :: OSI Approved :: MIT License",
-        "Operating System :: Linux",
+        "Operating System :: POSIX :: Linux",
+        "Environment :: GPU :: NVIDIA CUDA",
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Science/Research",
+        "Intended Audience :: Developers",
+        "Topic :: Scientific/Engineering",
+        "Topic :: Software Development",
     ],
     extras_require={
         'examples': ["pillow"]
     },
-    python_requires=">=3.8"
+    python_requires=">=3.8",
+    zip_safe=False
 )

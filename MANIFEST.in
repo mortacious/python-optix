@@ -1,1 +1,4 @@
 include optix/*.pxd
+include optix/*.pyx
+include optix/*.h
+exclude optix/*.cpp
