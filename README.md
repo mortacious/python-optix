@@ -1,6 +1,6 @@
 # Python-OptiX
 
-Python wrapper for the OptiX 7.3 raytracing engine by Nvidia.
+Python wrapper for the OptiX 7.3 raytracing engine.
 
 Python-OptiX wraps the OptiX C++ API using Cython and provides a simplified 
 interface to the original C-like API using mainly the 
