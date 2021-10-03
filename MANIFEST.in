@@ -1,4 +1,5 @@
 include optix/*.pxd
 include optix/*.pyx
 include optix/*.h
+include LICENSE
 exclude optix/*.cpp
