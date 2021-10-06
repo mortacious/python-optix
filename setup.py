@@ -1,6 +1,9 @@
 from setuptools import setup, Extension, find_packages
 from Cython.Build import cythonize
 
+import site, sys
+site.ENABLE_USER_SITE = "--user" in sys.argv[1:]
+
 
 # standalone import of a module (https://stackoverflow.com/a/58423785)
 def import_module_from_path(path):
