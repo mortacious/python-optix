@@ -439,8 +439,8 @@ cdef class Instance(OptixObject):
         cls = self.__class__
         result = cls.__new__(cls)
         memodict[id(self)] = result
-        result._instance = self.instance
-        result._traversable = deepcopy(self.traversable)
+        result.instance = self.instance
+        result.traversable = deepcopy(self.traversable)
 
         return result
 

@@ -28,10 +28,9 @@
 
 #include <optix.h>
 
-#include "optixDynamicMaterials.h"
-#include <cuda/helpers.h>
-
-#include <sutil/vec_math.h>
+#include "dynamic_materials.h"
+#include "helpers.h"
+#include "vec_math.h"
 
 extern "C" __constant__ Params params;
 

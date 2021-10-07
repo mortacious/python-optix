@@ -183,8 +183,3 @@ class CudaOutputBuffer:
         assert isinstance(stream, cp.cuda.Stream), type(stream)
         self._stream = value
     stream = property(_get_stream, _set_stream)
-
-
-if __name__ == '__main__':
-    buf = CudaOutputBuffer(CudaOutputBufferType.CUDA_DEVICE, 'float4', 800, 600)
-    buf.get_pbo()

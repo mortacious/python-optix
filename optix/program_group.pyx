@@ -178,7 +178,7 @@ cdef class ProgramGroup(OptixContextObject):
         context: DeviceContext
             The context to use for this ProgramGroup.
         module: Module
-            The module containig the raygen function.
+            The module containing the raygen function.
         entry_function_name: str
             The name of the raygen function in the module.
 
@@ -199,7 +199,7 @@ cdef class ProgramGroup(OptixContextObject):
         context: DeviceContext
             The context to use for this ProgramGroup.
         module: Module
-            The module containig the miss function.
+            The module containing the miss function.
         entry_function_name: str
             The name of the miss function in the module.
 
@@ -220,7 +220,7 @@ cdef class ProgramGroup(OptixContextObject):
         context: DeviceContext
             The context to use for this ProgramGroup.
         module: Module
-            The module containig the exception function.
+            The module containing the exception function.
         entry_function_name: str
             The name of the exception function in the module.
 
