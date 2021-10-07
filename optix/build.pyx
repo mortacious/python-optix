@@ -421,7 +421,7 @@ cdef class Instance(OptixObject):
                  visibility_mask=None):
         if transform is None:
             transform = np.eye(3, 4, dtype=np.float32)
-        transform = np.asarray(transform, dtype=np.float32).reshape(3,4)
+        transform = np.ascontiguousarray(np.asarray(transform, dtype=np.float32).reshape(3,4))
         cdef float[:, ::1] c_transform = transform
         memcpy(&self.instance.transform, &c_transform[0, 0], sizeof(float) * 12)
         self.traversable = traversable
@@ -429,7 +429,7 @@ cdef class Instance(OptixObject):
         self.instance.instanceId = instance_id
         self.instance.flags = flags.value
         self.instance.sbtOffset = sbt_offset
-        visibility_mask = int(visibility_mask) if visibility_mask is not None else 0
+        visibility_mask = int(visibility_mask) if visibility_mask is not None else (2**(sizeof(unsigned int) * 8) - 1)
         if visibility_mask.bit_length() > self.traversable.context.num_bits_instances_visibility_mask:
             raise ValueError(f"Too many entries in visibility mask. Got {visibility_mask.bit_length()} but supported are only {self.traversable.context.num_bits_instances_visibility_mask}")
         self.instance.visibilityMask = visibility_mask
