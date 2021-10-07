@@ -429,7 +429,7 @@ cdef class Instance(OptixObject):
         self.instance.instanceId = instance_id
         self.instance.flags = flags.value
         self.instance.sbtOffset = sbt_offset
-        visibility_mask = int(visibility_mask)
+        visibility_mask = int(visibility_mask) if visibility_mask is not None else 0
         if visibility_mask.bit_length() > self.traversable.context.num_bits_instances_visibility_mask:
             raise ValueError(f"Too many entries in visibility mask. Got {visibility_mask.bit_length()} but supported are only {self.traversable.context.num_bits_instances_visibility_mask}")
         self.instance.visibilityMask = visibility_mask
@@ -464,7 +464,7 @@ cdef class BuildInputInstanceArray(BuildInputArray):
         cdef vector[OptixInstance] c_instances
         c_instances.reserve(len(instances))
         for inst in instances:
-            c_instances.push_back(inst._instance)
+            c_instances.push_back((<Instance>inst).instance)
 
         cp.cuda.runtime.memcpy(self._d_instances.ptr, <size_t>c_instances.data(), size, cp.cuda.runtime.memcpyHostToDevice)
 
@@ -581,7 +581,7 @@ cdef class AccelerationStructure(OptixContextObject):
         if isinstance(build_inputs[0], BuildInputInstanceArray):
             if inputs_size > 1:
                 raise ValueError("Only a single build input allowed for instance builds")
-            self._instances = build_inputs[0].instances # keep the instances so the buffers do not get deleted
+            self._instances = (<BuildInputInstanceArray>build_inputs[0]).instances # keep the instances so the buffers do not get deleted
 
         cdef vector[OptixAccelBuildOptions] accel_options# = vector[OptixAccelBuildOptions](inputs_size)
         self._init_accel_options(inputs_size, self._build_flags, OPTIX_BUILD_OPERATION_BUILD, accel_options)

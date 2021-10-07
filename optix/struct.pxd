@@ -12,7 +12,7 @@ cdef extern from "optix_includes.h" nogil:
 
 
 cdef class _StructHelper(OptixObject):
-    cdef object dtype
+    cdef object _dtype
     cdef dict array_values
     cdef object _array
 

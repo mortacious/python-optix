@@ -81,19 +81,24 @@ cdef class _StructHelper:
         formats = ensure_iterable(formats)
 
         self.array_values = {} # init dict
-        self.dtype = self._convert_to_aligned_dtype(names, formats, alignment)
+        self._dtype = self._convert_to_aligneddtype(names, formats, alignment)
         self._array = self._create(size)
 
         if values is not None:
             for name, value in names, values:
                 if value is not None:
                     self.__setitem__(name, value)
+
+    @property
+    def dtype(self):
+        return self._dtype
+
     @property
     def array(self):
         return self._array
 
     @classmethod
-    def from_dtype(cls, dtype, values=None, size=1, alignment=1):
+    def fromdtype(cls, dtype, values=None, size=1, alignment=1):
         """
         Create the struct from a numpy structured dtype.
 
@@ -153,7 +158,7 @@ cdef class _StructHelper:
                 values.append(v[1])
         return cls(names=names, formats=formats, values=values, size=size, alignment=1)
 
-    def _convert_to_aligned_dtype(self, names, formats, alignment):
+    def _convert_to_aligneddtype(self, names, formats, alignment):
         """
         Construct an aligned dtype from the names and formats
 
@@ -180,14 +185,14 @@ cdef class _StructHelper:
         return array
 
     def _create(self, size):
-        array = np.zeros(size, dtype=self.dtype)
+        array = np.zeros(size, dtype=self._dtype)
         array = self._prepare_array(array)
         return array
 
     def __setitem__(self, key, value):
         value = (value,) if not isinstance(value, (list, tuple)) else value
         # special hook for cupy arrays if a pointer is to be stored
-        if np.issubdtype(self.dtype.fields[key][0], 'u8') and all(isinstance(v, cp.ndarray) for v in value):
+        if np.issubdtype(self._dtype.fields[key][0], 'u8') and all(isinstance(v, cp.ndarray) for v in value):
             self.array_values[key] = value
             value = [v.data.ptr for v in value]
         self.array[key] = value
@@ -196,13 +201,13 @@ cdef class _StructHelper:
         return self.array[key]
 
     def __len__(self):
-        return len(self.dtype.fields)
+        return len(self._dtype.fields)
 
     def __iter__(self):
         yield from self.keys()
 
     def __contains__(self, item):
-        return item in self.dtype.fields
+        return item in self._dtype.fields
 
     def get(self, item, value=None):
         try:
@@ -211,7 +216,7 @@ cdef class _StructHelper:
             return value
 
     def keys(self):
-        yield from self.dtype.fields
+        yield from self._dtype.fields
 
     def values(self):
         for k in self.keys():
@@ -236,19 +241,19 @@ cdef class _StructHelper:
         """
         size = self.array.shape[0]
         mem = array_to_device_memory(self.array, stream=stream)
-        array = cp.ndarray(size, dtype=self.dtype, memptr=mem)
+        array = cp.ndarray(size, dtype=self._dtype, memptr=mem)
         return array
 
     @property
     def itemsize(self):
-        return self.dtype.itemsize
+        return self._dtype.itemsize
 
     @property
     def size(self):
         return self._array.shape[0]
 
     def _repr_details(self):
-        return f"size {self.size}, dtype {self.dtype}"
+        return f"size {self.size}, dtype {self._dtype}"
 
 
 cdef class SbtRecord(_StructHelper):
