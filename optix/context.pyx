@@ -21,6 +21,9 @@ cdef void context_log_cb(unsigned int level, const char * tag, const char * mess
         cb_object(level, tag.decode(), message.decode())
 
 
+cdef size_t MAXIMUM_LAUNCH_SIZE = 2**30
+
+
 cdef class DeviceContext(OptixObject):
     """
     Represents an OptiX context on a single device. This class wraps the OptixDeviceContext struct.
@@ -232,6 +235,14 @@ cdef class DeviceContext(OptixObject):
         The device of this context
         """
         return self._device
+
+    @property
+    def maximum_launch_size(self):
+        """
+        The maximum launch size (over width, height, depth) of a single pipeline launch
+        """
+        return MAXIMUM_LAUNCH_SIZE
+
 
     def _repr_details(self):
         return f"device id {self._device.id}"

@@ -405,6 +405,10 @@ cdef class Pipeline(OptixContextObject):
         for i in range(len(dimensions)):
             c_dims[i] = dimensions[i]
 
+        cdef size_t total_launch_size = c_dims[0] * c_dims[1] * c_dims[2]
+        if total_launch_size > self.context.maximum_launch_size:
+            raise ValueError(f"Requested launch size of {total_launch_size} is larger than the limit of {self.context.maximum_launch_size} set by OptiX.")
+
         cdef size_t c_stream = 0
         if stream is not None:
             c_stream = stream.ptr
