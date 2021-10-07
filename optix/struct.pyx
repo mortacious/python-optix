@@ -290,7 +290,7 @@ cdef class LaunchParamsRecord(_StructHelper):
     All options are the same as in the base class.
     The alignment parameter is ignored though and only present for the interface.
     """
-    def __init__(self, names=(), formats=(), values=None, size=1, alignment=1):
+    def __init__(self, names=(), formats=(), values=None, size=1, alignment=8):
         # init with 8 bytes alignment #TODO is there a constant for that?
         super().__init__(names, formats, values=None, size=size, alignment=8)
 
