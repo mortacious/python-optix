@@ -1,30 +1,55 @@
-import os, sys, logging
+import os, sys, logging, collections
 
 import numpy as np
 import cupy as cp
 import optix as ox
 
-from optix.sutils.cuda_output_buffer import CudaOutputBufferType
+from optix.sutils.gui import init_ui
 from optix.sutils.camera import Camera
+from optix.sutils.cuda_output_buffer import CudaOutputBufferType
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 log = logging.getLogger()
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
+
 class Params:
+    _struct = collections.OrderedDict([
+            ('image', 'u8'),
+            ('image_width', 'u4'),
+            ('image_height', 'u4'),
+            ('radius', 'f4'),
+            ('handle', 'u8'),
+            ('cam_eye', '3f4'),
+            ('camera_u', '3f4'),
+            ('camera_v', '3f4'),
+            ('camera_w', '3f4'),
+            ('hit_group_record_idx_0', 'u4'),
+            ('hit_group_record_stride', 'u4'),
+        ])
+
+    @classmethod
+    def names(cls):
+        return tuple(cls._struct.keys())
+
+    @classmethod
+    def formats(cls):
+        return tuple(cls._struct.values())
+
     def __init__(self):
-        self.image = None
-        self.image_width = None
-        self.image_height = None
-        self.radius = None
-        self.handle = None
-        self.cam_eye = None
-        self.camera_u = None
-        self.camera_v = None
-        self.camera_w = None
-        self.hit_group_record_idx_0 = None
-        self.hit_group_record_stride = None
+        self.handle = ox.LaunchParamsRecord(names=self.names(), formats=self.formats())
+
+    def __getattribute__(self, name):
+        if name in Params._struct.keys():
+            return self.__dict__['handle'][name]
+        return super().__getattribute__(name)
+
+    def __setattribute__(self, name, value):
+        if name in Params._struct.keys():
+            self.__dict__['handle'][name] = value
+        super().__setattribute__(name, value)
+
 
 class SampleState:
     def __init__(self, width, height):
@@ -45,27 +70,6 @@ class SampleState:
         self.pipeline_opts = None
 
 
-# Transforms for instances - one on the left (sphere 0), one in the centre and one on the right (sphere 2).
-transforms = np.asarray([
-    [1, 0, 0, -6, 
-     0, 1, 0, 0, 
-     0, 0, 1, -10],
-    [1, 0, 0, 0, 
-     0, 1, 0, 0, 
-     0, 0, 1, -10],
-    [1, 0, 0, 6, 
-     0, 1, 0, 0, 
-     0, 0, 1, -10],
-], dtype=np.float32).reshape(3,3,4)
-
-# Offsets into SBT for each instance. Hence this needs to be in sync with transforms!
-# The middle sphere has two SBT records, the two other instances have one each.
-sbt_offsets = np.asarray([0, 1, 3], dtype=np.uint32)
-
-g_colors = np.asarray([[1, 0, 0],  
-                       [0, 1, 0],
-                       [0, 0, 1]], dtype=np.float32)
-
 class MaterialIndex:
     def __init__(self, max_index):
         self._index = 0
@@ -82,16 +86,38 @@ class MaterialIndex:
         self.index = self.index + 1
         return self.index
 
+
+# Transforms for instances - one on the left (sphere 0), one in the center and one on the right (sphere 2).
+transforms = np.asarray([
+    [1, 0, 0, -6,
+     0, 1, 0, 0,
+     0, 0, 1, -10],
+    [1, 0, 0, 0,
+     0, 1, 0, 0,
+     0, 0, 1, -10],
+    [1, 0, 0, 6,
+     0, 1, 0, 0,
+     0, 0, 1, -10],
+], dtype=np.float32).reshape(3,3,4)
+
+# Offsets into SBT for each instance. Hence this needs to be in sync with transforms!
+# The middle sphere has two SBT records, the two other instances have one each.
+sbt_offsets = np.asarray([0, 1, 3], dtype=np.uint32)
+
+g_colors = np.asarray([[1, 0, 0],
+                       [0, 1, 0],
+                       [0, 0, 1]], dtype=np.float32)
+
 # Left sphere
-g_materialIndex_0 = MaterialIndex(3)
+g_material_index_0 = MaterialIndex(3)
 g_hasDataChanged = False;
 
 # Middle sphere
-g_materialIndex_1 = MaterialIndex(2)
+g_material_index_1 = MaterialIndex(2)
 g_hasOffsetChanged = False;
 
 # Right sphere
-g_materialIndex_2 = MaterialIndex(3)
+g_material_index_2 = MaterialIndex(3)
 g_hasSbtChanged = False;
 
 ##------------------------------------------------------------------------------
@@ -148,7 +174,7 @@ def create_module(state):
             max_register_count=ox.ModuleCompileOptions.DEFAULT_MAX_REGISTER_COUNT,
             opt_level=ox.CompileOptimizationLevel.DEFAULT,
             debug_level=ox.CompileDebugLevel.LINEINFO)
-    
+
     source = os.path.join(script_dir, 'cuda', 'dynamic_materials.cu')
     state.module = ox.Module(state.ctx, source, compile_opts, pipeline_opts)
     state.pipeline_opts = pipeline_opts
@@ -158,14 +184,14 @@ def create_program_groups(state):
 
     state.raygen_grp = ox.ProgramGroup.create_raygen(ctx, module, "__raygen__rg")
     state.miss_grp = ox.ProgramGroup.create_miss(ctx, module, "__miss__ms")
-    
-    # The left sphere has a single CH progra
+
+    # The left sphere has a single CH program
     # The middle sphere toggles between two CH programs
-    # The right sphere uses the g_materialIndex_2.getVal()'th of these CH programs
-    ch_names = ('__closesthit__ch' , 
+    # The right sphere uses the g_material_index_2.index'th of these CH programs
+    ch_names = ('__closesthit__ch' ,
                 '__closesthit__ch', '__closesthit__normal',
                 '__closesthit__blue', '__closesthit__green', '__closesthit__red')
-    
+
     hit_grps = []
     for ch_name in ch_names:
         hit_grp = ox.ProgramGroup.create_hitgroup(ctx, module,
@@ -176,15 +202,15 @@ def create_program_groups(state):
 
 def create_pipeline(state):
     program_grps = [state.raygen_grp, state.miss_grp] + state.hit_grps
-    
+
     link_opts = ox.PipelineLinkOptions(max_trace_depth=1,
                                        debug_level=ox.CompileDebugLevel.FULL)
-    
+
     pipeline = ox.Pipeline(state.ctx,
                            compile_options=state.pipeline_opts,
                            link_options=link_opts,
                            program_groups=program_grps)
-    
+
     pipeline.compute_stack_sizes(1,  # max_trace_depth
                                  0,  # max_cc_depth
                                  0)  # max_dc_depth
@@ -198,31 +224,34 @@ def create_sbt(state):
 
     miss_sbt = ox.SbtRecord(miss_grp, names=('color',), formats=('3f4',))
     miss_sbt['color'] = [0.3, 0.1, 0.2]
-    
-    hit_sbts = ox.SbtRecord(hit_grps[0], names=('color', 'idx'), formats=('3f4', 'u4'), size=4)
+
+    hit_groups = [hit_grps[0], hit_grps[1], hit_grps[2], hit_grps[g_material_index_2.index + 3]]
+    hit_sbts = ox.SbtRecord(hit_groups, names=('color', 'idx'), formats=('3f4', 'u4'), size=4)
 
     # The left sphere cycles through three colors by updating the data field of the SBT record.
     hit_sbts['color'][0] = g_colors[0]
     hit_sbts['idx'][0] = np.uint32(0)
-    
+
     # The middle sphere toggles between two SBT records by adjusting the SBT
     # offset field of the sphere instance. The IAS needs to be rebuilt for the
     # update to take effect.
     hit_sbts['color'][1] = g_colors[1]
     hit_sbts['idx'][1] = np.uint32(1)
-    
+
     hit_sbts['color'][2] = g_colors[1]
     hit_sbts['idx'][2] = np.uint32(1)
-    
+
     # The right sphere cycles through colors by modifying the SBT. On update, a
     # different pre-built CH program is packed into the corresponding SBT
     # record.
     hit_sbts['color'][3] = [0,0,0]
     hit_sbts['idx'][3] = np.uint32(2)
-    
-    state.sbt = ox.ShaderBindingTable(raygen_record=raygen_sbt, miss_records=miss_sbt, 
+
+    state.sbt = ox.ShaderBindingTable(raygen_record=raygen_sbt, miss_records=miss_sbt,
             hitgroup_records=hit_sbts)
 
+def init_launch(state):
+    state.params.handle = state.ias.handle
 
 if __name__ == '__main__':
     state = SampleState(1024, 768)
@@ -236,4 +265,8 @@ if __name__ == '__main__':
     create_program_groups(state)
     create_pipeline(state)
     create_sbt(state)
+
+    init_launch(state)
+
+    window = init_ui("optixDynamicMaterials", state.params.image_width, state.params.image_height)
 

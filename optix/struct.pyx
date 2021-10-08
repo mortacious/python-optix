@@ -262,11 +262,20 @@ cdef class SbtRecord(_StructHelper):
     All options are the same as in the base class.
 .   The alignment parameter is ignored though and only present for the interface.
     """
-    def __init__(self, ProgramGroup program_group, names=(), formats=(), values=None, size=1, alignment=1):
+    def __init__(self, program_groups, names=(), formats=(), values=None, size=1, alignment=1):
+        program_groups = tuple(ensure_iterable(program_groups))
         names = ensure_iterable(names)
         formats = ensure_iterable(formats)
+        
+        if not all(isinstance(p, ProgramGroup) for p in program_groups):
+            raise TypeError("Only program groups")
+        
+        cdef unsigned int num_program_groups = len(program_groups)
+        if num_program_groups != size:
+            raise ValueError("program_group size and size should match.")
+        
+        self.program_groups = program_groups
 
-        self.program_group = program_group
         header_format = '{}B'.format(OPTIX_SBT_RECORD_HEADER_SIZE)
         names = ('header',) + names
         formats = (header_format,) + formats
@@ -280,7 +289,7 @@ cdef class SbtRecord(_StructHelper):
         cdef size_t size = array.shape[0]
         cdef unsigned char[:, ::1] buffer =  array.view('B').reshape(-1, itemsize)
         for i in range(size):
-            optixSbtRecordPackHeader(self.program_group.program_group, <void *>(&buffer[i, 0]))
+            optixSbtRecordPackHeader((<ProgramGroup>self.program_groups[i]).program_group, <void *>(&buffer[i, 0]))
         return array
 
 

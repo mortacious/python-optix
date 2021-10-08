@@ -18,7 +18,7 @@ cdef class _StructHelper(OptixObject):
 
 
 cdef class SbtRecord(_StructHelper):
-    cdef ProgramGroup program_group
+    cdef tuple program_groups
     cdef str header_format
 
 
