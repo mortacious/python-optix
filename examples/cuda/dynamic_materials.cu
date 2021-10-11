@@ -92,7 +92,7 @@ extern "C" __global__ void __raygen__rg()
     const float3 origin      = params.cam_eye;
     const float3 direction   = normalize( d.x * U + d.y * V + W );
     float3       payload_rgb = make_float3( 0.5f, 0.5f, 0.5f );
-    trace( params.handle, origin, direction,
+    trace( params.trav_handle, origin, direction,
            0.00f,  // tmin
            1e16f,  // tmax
            &payload_rgb );

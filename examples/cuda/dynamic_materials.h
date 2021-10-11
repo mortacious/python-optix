@@ -32,11 +32,9 @@ struct Params
     unsigned int           image_width;
     unsigned int           image_height;
     float                  radius;
-    OptixTraversableHandle handle;
     float3                 cam_eye;
     float3                 camera_u, camera_v, camera_w;
-    unsigned int           hitgroupRecordIdx_0;
-    unsigned int           hitgroupRecordStride;
+    OptixTraversableHandle trav_handle;
 };
 
 

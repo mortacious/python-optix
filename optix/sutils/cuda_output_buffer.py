@@ -8,14 +8,6 @@ from OpenGL.GL import glGenBuffers, glBindBuffer, glBufferData, glBindBuffer, GL
 from optix.sutils.vecmath import vtype_to_dtype
 
 
-class CudaMemcpyKind:
-    HostToHost = 0
-    HostToDevice = 1
-    DeviceToHost = 2
-    DeviceToDevice = 3
-    Default = 4
-
-
 class CudaOutputBufferType(enum.Enum):
     CUDA_DEVICE = 0, # not preferred, typically slower than ZERO_COPY
     GL_INTEROP  = 1, # single device only, preferred for single device
@@ -54,7 +46,7 @@ class CudaOutputBuffer:
         self._make_current()
         if (self._host_buffer is None) or (self._device_buffer is None):
             self._reallocate_buffers()
-        return self._device_buffer
+        return self._device_buffer.data.ptr
 
     def unmap(self):
         self._make_current()
@@ -90,7 +82,7 @@ class CudaOutputBuffer:
 
     def copy_device_to_host(self):
         cp.cuda.runtime.memcpy(self._host_buffer.__array_interface__['data'][0], 
-                self._device_buffer.data.ptr, self._host_buffer.nbytes, CudaMemcpyKind.DeviceToHost)
+                self._device_buffer.data.ptr, self._host_buffer.nbytes, cp.cuda.runtime.memcpyDeviceToHost)
     
     def copy_host_to_pbo(self):
         glBindBuffer(GL_ARRAY_BUFFER, self._pbo)
@@ -143,7 +135,7 @@ class CudaOutputBuffer:
         return self._width
     def _set_width(self, value):
         assert value >= 1, value
-        value = np.int32(value)
+        value = np.int32(np.asscalar(value))
         if value != self._width:
             self._width = value
             self._host_buffer = None
@@ -154,7 +146,7 @@ class CudaOutputBuffer:
         return self._height
     def _set_height(self, value):
         assert value >= 1, value
-        value = np.int32(value)
+        value = np.int32(np.asscalar(value))
         if value != self._height:
             self._height = value
             self._host_buffer = None

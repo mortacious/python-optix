@@ -262,8 +262,8 @@ cdef class SbtRecord(_StructHelper):
     All options are the same as in the base class.
 .   The alignment parameter is ignored though and only present for the interface.
     """
-    def __init__(self, program_groups, names=(), formats=(), values=None, size=1, alignment=1):
-        program_groups = tuple(ensure_iterable(program_groups))
+    def __init__(self, program_groups, names=(), formats=(), values=None):
+        program_groups = list(ensure_iterable(program_groups))
         names = ensure_iterable(names)
         formats = ensure_iterable(formats)
         
@@ -271,15 +271,13 @@ cdef class SbtRecord(_StructHelper):
             raise TypeError("Only program groups")
         
         cdef unsigned int num_program_groups = len(program_groups)
-        if num_program_groups != size:
-            raise ValueError("program_group size and size should match.")
         
         self.program_groups = program_groups
 
         header_format = '{}B'.format(OPTIX_SBT_RECORD_HEADER_SIZE)
         names = ('header',) + names
         formats = (header_format,) + formats
-        super().__init__(names, formats, values=values, size=size, alignment=OPTIX_SBT_RECORD_ALIGNMENT)
+        super().__init__(names, formats, values=values, size=num_program_groups, alignment=OPTIX_SBT_RECORD_ALIGNMENT)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -291,6 +289,15 @@ cdef class SbtRecord(_StructHelper):
         for i in range(size):
             optixSbtRecordPackHeader((<ProgramGroup>self.program_groups[i]).program_group, <void *>(&buffer[i, 0]))
         return array
+
+    def update_program_group(self, i, program_group):
+        if not isinstance(program_group, ProgramGroup):
+            raise TypeError("Expected a program group as second argument.")
+        self.program_groups[i] = program_group
+        
+        cdef size_t itemsize = self._array.dtype.itemsize
+        cdef unsigned char[:, ::1] buffer = self._array.view('B').reshape(-1, itemsize)
+        optixSbtRecordPackHeader((<ProgramGroup>self.program_groups[<size_t>i]).program_group, <void *>(&buffer[i, 0]))
 
 
 cdef class LaunchParamsRecord(_StructHelper):
