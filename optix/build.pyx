@@ -429,9 +429,11 @@ cdef class Instance(OptixObject):
         self.instance.instanceId = instance_id
         self.instance.flags = flags.value
         self.instance.sbtOffset = sbt_offset
-        visibility_mask = int(visibility_mask) if visibility_mask is not None else (2**(sizeof(unsigned int) * 8) - 1)
+
+        max_visibility_mask_bits = self.traversable.context.num_bits_instances_visibility_mask
+        visibility_mask = int(visibility_mask) if visibility_mask is not None else (2**max_visibility_mask_bits - 1)
         if visibility_mask.bit_length() > self.traversable.context.num_bits_instances_visibility_mask:
-            raise ValueError(f"Too many entries in visibility mask. Got {visibility_mask.bit_length()} but supported are only {self.traversable.context.num_bits_instances_visibility_mask}")
+            raise ValueError(f"Too many entries in visibility mask. Got {visibility_mask.bit_length()} but supported are only {max_visibility_mask_bits}")
         self.instance.visibilityMask = visibility_mask
 
     def __deepcopy__(self, memodict={}):

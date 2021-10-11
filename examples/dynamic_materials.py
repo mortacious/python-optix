@@ -182,7 +182,7 @@ def build_ias(state):
     instances = []
     for i in range(transforms.shape[0]):
         instance = ox.Instance(traversable=state.gas, instance_id=0, flags=ox.InstanceFlags.NONE,
-                sbt_offset=sbt_offsets[i], transform=transforms[i], visibility_mask=1)
+                sbt_offset=sbt_offsets[i], transform=transforms[i])
         instances.append(instance)
 
     build_input = ox.BuildInputInstanceArray(instances)
@@ -192,7 +192,7 @@ def build_ias(state):
 def create_module(state):
     pipeline_opts = ox.PipelineCompileOptions(
             uses_motion_blur=False,
-            traversable_graph_flags=ox.TraversableGraphFlags.ALLOW_ANY,
+            traversable_graph_flags=ox.TraversableGraphFlags.ALLOW_SINGLE_LEVEL_INSTANCING,
             num_payload_values=3,
             num_attribute_values=3,
             exception_flags=ox.ExceptionFlags.DEBUG | ox.ExceptionFlags.TRACE_DEPTH | ox.ExceptionFlags.STACK_OVERFLOW,
@@ -345,7 +345,7 @@ def launch(state, output_buffer):
 
 def display(output_buffer, gl_display, window):
     (framebuf_res_x, framebuf_res_y) = glfw.get_framebuffer_size(window)
-    gl_display.display( int(output_buffer.width), int(output_buffer.height),
+    gl_display.display( output_buffer.width, output_buffer.height,
                         framebuf_res_x, framebuf_res_y,
                         output_buffer.get_pbo() )
 
@@ -377,14 +377,16 @@ if __name__ == '__main__':
 
     window, impl = init_ui("optixDynamicMaterials", state.params.image_width, state.params.image_height)
 
+    glfw.set_key_callback(window, key_callback)
+
     output_buffer = CudaOutputBuffer(output_buffer_type, buffer_format,
             state.params.image_width, state.params.image_height)
-    glfw.set_key_callback(window, key_callback)
 
     gl_display = GLDisplay(buffer_format)
 
     while not glfw.window_should_close(window):
         glfw.poll_events()
+
         update_state(output_buffer, state)
         launch(state, output_buffer)
         display(output_buffer, gl_display, window)
@@ -392,7 +394,6 @@ if __name__ == '__main__':
 
         imgui.render()
         impl.render(imgui.get_draw_data())
-
         glfw.swap_buffers(window)
 
     impl.shutdown()

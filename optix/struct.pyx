@@ -297,7 +297,7 @@ cdef class SbtRecord(_StructHelper):
         
         cdef size_t itemsize = self._array.dtype.itemsize
         cdef unsigned char[:, ::1] buffer = self._array.view('B').reshape(-1, itemsize)
-        optixSbtRecordPackHeader((<ProgramGroup>self.program_groups[<size_t>i]).program_group, <void *>(&buffer[i, 0]))
+        optixSbtRecordPackHeader((<ProgramGroup>self.program_groups[<size_t>i]).program_group, <void *>(&buffer[<size_t>i, 0]))
 
 
 cdef class LaunchParamsRecord(_StructHelper):
