@@ -28,6 +28,19 @@ def init_ui(window_title, width, height):
         raise RuntimeError("Could not initialize Window")
 
     init_gl()
-    init_imgui(window)
+    impl = init_imgui(window)
 
-    return window
+    return window, impl
+
+def display_text(text, x, y):
+    imgui.set_next_window_bg_alpha(0.0)
+    imgui.set_next_window_position(x, y)
+
+    flags = (imgui.WINDOW_NO_TITLE_BAR | imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE |
+             imgui.WINDOW_NO_SCROLLBAR | imgui.WINDOW_NO_SAVED_SETTINGS | imgui.WINDOW_NO_INPUTS)
+
+    imgui.begin("TextOverlayFG", None, flags)
+    imgui.push_style_color(imgui.COLOR_TEXT, 0.7, 0.7, 0.7, 1.0)
+    imgui.text(text)
+    imgui.pop_style_color()
+    imgui.end()

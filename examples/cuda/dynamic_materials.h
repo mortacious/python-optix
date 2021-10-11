@@ -38,13 +38,6 @@ struct Params
 };
 
 
-struct RayGenData
-{
-    float3 cam_eye;
-    float3 camera_u, camera_v, camera_w;
-};
-
-
 struct MissData
 {
     float3 color;

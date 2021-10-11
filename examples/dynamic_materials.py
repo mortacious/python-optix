@@ -3,12 +3,12 @@ import os, sys, logging, collections
 import numpy as np
 import cupy as cp
 import optix as ox
-import glfw
+import glfw, imgui
 
-from optix.sutils.gui import init_ui
+from optix.sutils.gui import init_ui, display_text
 from optix.sutils.camera import Camera
 from optix.sutils.gl_display import GLDisplay
-from optix.sutils.cuda_output_buffer import CudaOutputBuffer, CudaOutputBufferType
+from optix.sutils.cuda_output_buffer import CudaOutputBuffer, CudaOutputBufferType, BufferImageFormat
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 log = logging.getLogger()
@@ -36,7 +36,7 @@ class Params:
     @classmethod
     def formats(cls):
         return tuple(cls._struct.values())
-    
+
     def __init__(self):
         self.handle = ox.LaunchParamsRecord(names=self.names(), formats=self.formats())
 
@@ -71,7 +71,7 @@ class SampleState:
         self.raygen_grp = None
         self.miss_grp = None
         self.hit_grps = None
-    
+
         raygen_sbt = None
         miss_sbt = None
         hit_sbts = None
@@ -102,14 +102,14 @@ class MaterialIndex:
         return self.index
 
 def key_callback(window, key, scancode, action, mods):
-    if action == GLFW_PRESS:
-        if key in {GLFW_KEY_Q, GLFW_KEY_ESCAPE}:
-            glfwSetWindowShouldClose(window, True)
-        elif key == GLFW_KEY_LEFT:
-            g_has_data_changed = True 
-        elif key == GLFW_KEY_RIGHT:
+    if action == glfw.PRESS:
+        if key in {glfw.KEY_Q, glfw.KEY_ESCAPE}:
+            glfw.set_window_should_close(window, True)
+        elif key == glfw.KEY_LEFT:
+            g_has_data_changed = True
+        elif key == glfw.KEY_RIGHT:
             g_has_sbt_changed = True
-        elif key == GLFW_KEY_UP:
+        elif key == glfw.KEY_UP:
             g_has_offset_changed = True
 
 
@@ -197,7 +197,7 @@ def create_module(state):
             num_attribute_values=3,
             exception_flags=ox.ExceptionFlags.DEBUG | ox.ExceptionFlags.TRACE_DEPTH | ox.ExceptionFlags.STACK_OVERFLOW,
             pipeline_launch_params_variable_name="params")
-    
+
     compile_opts = ox.ModuleCompileOptions(
             max_register_count=ox.ModuleCompileOptions.DEFAULT_MAX_REGISTER_COUNT,
             opt_level=ox.CompileOptimizationLevel.DEFAULT,
@@ -237,7 +237,8 @@ def create_pipeline(state):
     pipeline = ox.Pipeline(state.ctx,
                            compile_options=state.pipeline_opts,
                            link_options=link_opts,
-                           program_groups=program_grps)
+                           program_groups=program_grps,
+                           max_traversable_graph_depth=2)
 
     pipeline.compute_stack_sizes(1,  # max_trace_depth
                                  0,  # max_cc_depth
@@ -328,22 +329,41 @@ def update_sbt_header(state):
 
     # The right sphere will use the next compiled program group.
     material_index = g_material_index_2.nextval()
-    
+
     state.hit_groups.update_program_group(3, hit_grps[3 + material_index])
-    
+
     state.sbt = ox.ShaderBindingTable(raygen_record=state.raygen_sbt, miss_records=state.miss_sbt,
             hitgroup_records=state.hit_sbts)
 
 def launch(state, output_buffer):
     state.params.image = output_buffer.map()
-    
-    state.pipeline.launch(state.sbt, dimensions=state.dimensions, params=state.params.handle, stream=output_buffer.stream)
+
+    state.pipeline.launch(state.sbt, dimensions=state.dimensions,
+            params=state.params.handle, stream=output_buffer.stream)
 
     output_buffer.unmap()
-    
+
+def display(output_buffer, gl_display, window):
+    (framebuf_res_x, framebuf_res_y) = glfw.get_framebuffer_size(window)
+    gl_display.display( int(output_buffer.width), int(output_buffer.height),
+                        framebuf_res_x, framebuf_res_y,
+                        output_buffer.get_pbo() )
+
+
+def display_usage():
+    usage = """Use the arrow keys to modify the materials
+  [LEFT]  left sphere
+  [UP]    middle sphere
+  [RIGHT] right sphere"""
+
+    imgui.new_frame()
+    display_text(usage, 20.0, 20.0)
+    imgui.end_frame()
 
 if __name__ == '__main__':
     state = SampleState(1024, 768)
+
+    buffer_format = BufferImageFormat.UCHAR4
     output_buffer_type = CudaOutputBufferType.CUDA_DEVICE
 
     init_camera(state)
@@ -355,18 +375,26 @@ if __name__ == '__main__':
     create_pipeline(state)
     create_sbt(state)
 
-    window = init_ui("optixDynamicMaterials", state.params.image_width, state.params.image_height)
+    window, impl = init_ui("optixDynamicMaterials", state.params.image_width, state.params.image_height)
 
-    output_buffer = CudaOutputBuffer(output_buffer_type, 'uchar4', state.params.image_width, state.params.image_height)
+    output_buffer = CudaOutputBuffer(output_buffer_type, buffer_format,
+            state.params.image_width, state.params.image_height)
     glfw.set_key_callback(window, key_callback)
-                
-    gl_display = GLDisplay()
+
+    gl_display = GLDisplay(buffer_format)
 
     while not glfw.window_should_close(window):
         glfw.poll_events()
         update_state(output_buffer, state)
-        #launch(state, output_buffer)
+        launch(state, output_buffer)
         display(output_buffer, gl_display, window)
         display_usage()
+
+        imgui.render()
+        impl.render(imgui.get_draw_data())
+
         glfw.swap_buffers(window)
+
+    impl.shutdown()
+    glfw.terminate()
 
