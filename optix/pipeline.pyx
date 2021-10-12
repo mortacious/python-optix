@@ -76,7 +76,7 @@ cdef class PipelineCompileOptions(OptixObject):
         self.compile_options.numAttributeValues = num_attribute_values
         self.compile_options.exceptionFlags = exception_flags.value
         self.pipeline_launch_params_variable_name = pipeline_launch_params_variable_name
-        self.compile_options.usesPrimitiveTypeFlags = uses_primitive_type_flags.value
+        self.compile_options.usesPrimitiveTypeFlags = <int>(uses_primitive_type_flags.value)
 
     @property
     def uses_motion_blur(self):

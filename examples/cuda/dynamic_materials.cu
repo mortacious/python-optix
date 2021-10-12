@@ -34,7 +34,6 @@
 
 extern "C" __constant__ Params params;
 
-
 static __forceinline__ __device__ void trace( OptixTraversableHandle handle, float3 ray_origin, float3 ray_direction, float tmin, float tmax, float3* prd )
 {
     unsigned int p0, p1, p2;

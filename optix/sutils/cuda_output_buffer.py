@@ -47,7 +47,10 @@ class CudaOutputBuffer:
         self.pixel_format = pixel_format
         self.buffer_type = buffer_type
         self.resize(width, height)
+        self.stream = None
+
         self._reallocate_buffers()
+
 
     def resize(self, width, height):
         self.width = width
@@ -69,6 +72,7 @@ class CudaOutputBuffer:
 
     def unmap(self):
         self._make_current()
+        buffer_type = self.buffer_type
         if buffer_type is CudaOutputBufferType.CUDA_DEVICE:
             self._stream.synchronize()
         else:
@@ -131,12 +135,14 @@ class CudaOutputBuffer:
     def _get_pixel_format(self):
         return self._pixel_format
     def _set_pixel_format(self, value):
+        if value is None:
+            value = BufferImageFormat.UCHAR4
         if isinstance(value, BufferImageFormat):
             value = value.dtype
         elif isinstance(value, str):
             value = vtype_to_dtype(value)
         assert isinstance(value, np.dtype) or issubclass(value, np.generic), value
-        if value != self._pixel_format:
+        if value != getattr(self, '_pixel_format', None):
             self._pixel_format = value
             self._host_buffer = None
             self._device_buffer = None
@@ -145,8 +151,10 @@ class CudaOutputBuffer:
     def _get_buffer_type(self):
         return self._buffer_type
     def _set_buffer_type(self, value):
+        if value is None:
+            value = CudaOutputBufferType.CUDA_DEVICE
         assert isinstance(value, CudaOutputBufferType), type(value)
-        if value != self._buffer_type:
+        if value != getattr(self, '_buffer_type', None):
             self._buffer_type = value
             self._host_buffer = None
             self._device_buffer = None
@@ -155,9 +163,14 @@ class CudaOutputBuffer:
     def _get_width(self):
         return self._width
     def _set_width(self, value):
+        if value is None:
+            value = 1
         assert value >= 1, value
-        value = np.int32(np.asscalar(value))
-        if value != self._width:
+        try:
+            value = np.int32(np.asscalar(value))
+        except AttributeError:
+            value = np.int32(value)
+        if value != getattr(self, '_width', None):
             self._width = value
             self._host_buffer = None
             self._device_buffer = None
@@ -166,9 +179,14 @@ class CudaOutputBuffer:
     def _get_height(self):
         return self._height
     def _set_height(self, value):
+        if value is None:
+            value = 1
         assert value >= 1, value
-        value = np.int32(np.asscalar(value))
-        if value != self._height:
+        try:
+            value = np.int32(np.asscalar(value))
+        except AttributeError:
+            value = np.int32(value)
+        if value != getattr(self, '_height', None):
             self._height = value
             self._host_buffer = None
             self._device_buffer = None
@@ -178,10 +196,10 @@ class CudaOutputBuffer:
         return self._device
     def _set_device_idx(self, value):
         if value is None:
-            device_idx = 0
+            value = 0
         assert value >= 0, value
         value = int(value)
-        if value != self._device_idx:
+        if value != getattr(self, '_device_idx', None):
             self._device_idx = value
             self._device = cp.cuda.Device(value)
             self._host_buffer = None
@@ -193,6 +211,6 @@ class CudaOutputBuffer:
     def _set_stream(self, value):
         if value is None:
             value = cp.cuda.Stream.null
-        assert isinstance(stream, cp.cuda.Stream), type(stream)
+        assert isinstance(value, cp.cuda.Stream), type(value)
         self._stream = value
     stream = property(_get_stream, _set_stream)

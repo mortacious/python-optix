@@ -17,68 +17,48 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 
 
 class Params:
-    _struct = collections.OrderedDict([
-            ('image', 'u8'),
-            ('image_width', 'u4'),
+    _params = collections.OrderedDict([
+            ('image',        'u8'),
+            ('image_width',  'u4'),
             ('image_height', 'u4'),
-            ('radius', 'f4'),
-            ('cam_eye', '3f4'),
-            ('camera_u', '3f4'),
-            ('camera_v', '3f4'),
-            ('camera_w', '3f4'),
-            ('trav_handle', 'u8'),
+            ('radius',       'f4'),
+            ('cam_eye',      '3f4'),
+            ('camera_u',     '3f4'),
+            ('camera_v',     '3f4'),
+            ('camera_w',     '3f4'),
+            ('trav_handle',  'u8'),
         ])
 
-    @classmethod
-    def names(cls):
-        return tuple(cls._struct.keys())
-
-    @classmethod
-    def formats(cls):
-        return tuple(cls._struct.values())
-
     def __init__(self):
-        self.handle = ox.LaunchParamsRecord(names=self.names(), formats=self.formats())
+        self.handle = ox.LaunchParamsRecord(names=tuple(self._params.keys()),
+                                            formats=tuple(self._params.values()))
 
     def __getattribute__(self, name):
-        if name in Params._struct.keys():
+        if name in Params._params.keys():
             return self.__dict__['handle'][name]
-        elif name in {'names', 'formats', 'handle', '__dict__'}:
-            return super().__getattribute__(name)
         else:
-            raise AttributeError(name)
+            return super().__getattribute__(name)
 
     def __setattr__(self, name, value):
-        if name in Params._struct.keys():
+        if name in Params._params.keys():
             self.handle[name] = value
-        elif name in {'handle'}:
-            super().__setattr__(name, value)
         else:
-            raise AttributeError(name)
+            super().__setattr__(name, value)
 
 
 class SampleState:
+    __slots__ = ['params', 'ctx', 'gas', 'ias', 'module',
+                 'raygen_grp', 'miss_grp', 'hit_grps',
+                 'raygen_sbt', 'miss_sbt', 'hit_sbts',
+                 'sbt', 'pipeline', 'pipeline_opts']
+
     def __init__(self, width, height):
+        for slot in self.__slots__:
+            setattr(self, slot, None)
+
         self.params = Params()
         self.params.image_width = width
         self.params.image_height = height
-
-        self.ctx = None
-        self.gas = None
-        self.ias = None
-        self.module = None
-
-        self.raygen_grp = None
-        self.miss_grp = None
-        self.hit_grps = None
-
-        raygen_sbt = None
-        miss_sbt = None
-        hit_sbts = None
-        sbt = None
-
-        self.pipeline = None
-        self.pipeline_opts = None
 
     @property
     def dimensions(self):
@@ -94,7 +74,7 @@ class MaterialIndex:
         return self._index
     def _set_index(self, value):
         assert value >= 0, value
-        self._index = np.uint32(value % self._max_index)
+        self._index = int(value % self._max_index)
     index = property(_get_index, _set_index)
 
     def nextval(self):

@@ -2,13 +2,17 @@ import re
 
 import numpy as np
 
-length = np.linalg.norm
-
 cross = np.cross
+
+def dot(a, b):
+    return (a*b).sum(axis=-1)
+
+def length(x):
+    return np.sqrt(dot(x, x))
 
 def normalize(x):
     return x/length(x)
-    
+
 
 def ctype_to_dtype(ctype):
     _ctype_to_dtype = {
@@ -26,7 +30,7 @@ def ctype_to_dtype(ctype):
     ctype = ctype.replace('long int', 'long')
     ctype = ctype.replace('long long', 'longlong')
     ctype = ctype.replace('unsigned ', 'u')
-    
+
     if ctype not in _ctype_to_dtype:
         msg = "Cannot determine dtype from ctype '{ctype}'."
         raise ValueError(msg)
@@ -39,7 +43,7 @@ def vtype_to_dtype(vtype):
 
     match = regexp.match(vtype)
     if not match:
-        msg = "Cannot extract pixel format from '{pformat}'."
+        msg = "Cannot extract format from '{pformat}'."
         raise ValueError(msg)
 
     dtype = ctype_to_dtype(match.group(1))
