@@ -1,8 +1,6 @@
 
 #include "vec_math.h"
 
-#define M_PI 3.141592654f
-
 enum struct AnimationMode: int
 {
     NONE = 0,
@@ -11,7 +9,7 @@ enum struct AnimationMode: int
 };
 
 
-__forceinline__ __device__ float triangle_wave( float x, float shift = 0.f, float period = 2.f * M_PI, float amplitude = 1.f )
+__forceinline__ __device__ float triangle_wave( float x, float shift = 0.f, float period = 2.f * M_PIf, float amplitude = 1.f )
 {
     return fabsf( fmodf( ( 4.f / period ) * ( x - shift ), 4.f * amplitude ) - 2.f * amplitude ) - amplitude;
 }
@@ -23,13 +21,13 @@ __forceinline__ __device__ void write_animated_triangle( float3* out_vertices, i
     if( mode == AnimationMode::EXPLODE )
     {
         // Generate displacement vector from triangle index
-        const float theta = ( (float)M_PI * ( ( tidx + 1 ) * ( 13 / M_PI ) ) );
-        const float phi   = ( (float)( 2.0 * M_PI ) * ( ( tidx + 1 ) * ( 97 / M_PI ) ) );
+        const float theta = ( (float)M_PIf * ( ( tidx + 1 ) * ( 13 / M_PIf ) ) );
+        const float phi   = ( (float)( 2.0 * M_PIf ) * ( ( tidx + 1 ) * ( 97 / M_PIf ) ) );
 
         // Apply displacement to the sphere triangles
-        v = make_float3( triangle_wave( phi ) * triangle_wave( theta, M_PI / 2.f ),
-            triangle_wave( phi, M_PI / 2.f ) * triangle_wave( theta, M_PI / 2.f ), triangle_wave( theta ) )
-            * triangle_wave( time, M_PI / 2.f ) * 2.f;
+        v = make_float3( triangle_wave( phi ) * triangle_wave( theta, M_PIf / 2.f ),
+            triangle_wave( phi, M_PIf / 2.f ) * triangle_wave( theta, M_PIf / 2.f ), triangle_wave( theta ) )
+            * triangle_wave( time, M_PIf / 2.f ) * 2.f;
     }
 
     out_vertices[tidx * 3 + 0] = v0 + v;
@@ -56,10 +54,10 @@ extern "C" __global__ void generate_vertices(float3* out_vertices, AnimationMode
         int x = idx % width;
         int y = idx / width;
 
-        const float theta0 = ( ( float )M_PI * ( y + 0 ) ) / height;
-        const float theta1 = ( ( float )M_PI * ( y + 1 ) ) / height;
-        const float phi0 = ( ( float )( 2.0 * M_PI ) * ( x + 0 ) ) / width;
-        const float phi1 = ( ( float )( 2.0 * M_PI ) * ( x + 1 ) ) / width;
+        const float theta0 = ( ( float )M_PIf * ( y + 0 ) ) / height;
+        const float theta1 = ( ( float )M_PIf * ( y + 1 ) ) / height;
+        const float phi0 = ( ( float )( 2.0 * M_PIf ) * ( x + 0 ) ) / width;
+        const float phi1 = ( ( float )( 2.0 * M_PIf ) * ( x + 1 ) ) / width;
 
         const float ct0 = cosf( theta0 );
         const float st0 = sinf( theta0 );

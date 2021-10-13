@@ -50,6 +50,9 @@ class Params:
         else:
             raise AttributeError(name)
 
+    def __str__(self):
+        return '\n'.join(f'{k}:  {self.handle[k]}' for k in self._params)
+
 
 class DynamicGeometryState:
     __slots__ = ['params', 'time', 'ctx', 'module', 'pipeline', 'pipeline_opts',
@@ -98,10 +101,18 @@ g_diffuse_colors = np.asarray([
 INST_COUNT = g_diffuse_colors.shape[0]
 
 g_instances = np.asarray([
-    [1, 0, 0, -4.5, 0, 1, 0, 0, 0, 0, 1, 0],
-    [1, 0, 0, -1.5, 0, 1, 0, 0, 0, 0, 1, 0],
-    [1, 0, 0,  1.5, 0, 1, 0, 0, 0, 0, 1, 0],
-    [1, 0, 0,  4.5, 0, 1, 0, 0, 0, 0, 1, 0],
+    [1, 0, 0, -4.5, 
+     0, 1, 0, 0, 
+     0, 0, 1, 0],
+    [1, 0, 0, -1.5, 
+     0, 1, 0, 0, 
+     0, 0, 1, 0],
+    [1, 0, 0, 1.5, 
+     0, 1, 0, 0, 
+     0, 0, 1, 0],
+    [1, 0, 0, 4.5, 
+     0, 1, 0, 0, 
+     0, 0, 1, 0],
 ], dtype=np.float32).reshape(INST_COUNT, 3, 4)
 
 
@@ -191,6 +202,11 @@ def update_state(output_buffer, state):
 
 def launch_subframe(output_buffer, state):
     state.params.frame_buffer = output_buffer.map()
+    
+    print('LAUNCH SUBFRAME')
+    print('state.dimensions', state.dimensions)
+    print(f'state.output_buffer: width={output_buffer.width}  height={output_buffer.height}')
+    print(f'state.params\n{state.params}')
 
     state.pipeline.launch(state.sbt, dimensions=state.dimensions,
             params=state.params.handle, stream=output_buffer.stream)
@@ -240,21 +256,15 @@ def update_mesh_accel(state):
 
 def build_vertex_generation_kernel(state):
     cuda_source = os.path.join(script_dir, 'cuda', 'dynamic_geometry_vertex_generation.cu')
-
-    cuda_include_path = ox.path_utility.get_cuda_include_path()
-    optix_include_path = ox.path_utility.get_optix_include_path()
     example_include_path = os.path.dirname(cuda_source)
-
-    build_flags = ('-use_fast_math', '-lineinfo', '-default-device', '-std=c++11', '-rdc', 'true',
-            f'-I{cuda_include_path}', f'-I{optix_include_path}', f'-I{example_include_path}')
+    
+    build_flags = ox.module.get_default_nvrtc_compile_flags() + (f'-I{example_include_path}',)
 
     with open(cuda_source, 'r') as f:
         code = f.read()
 
-    module = cp.RawModule(code=code, backend='nvrtc', options=build_flags,
-            name_expressions=['generate_vertices'])
-
-    state.generate_vertices_kernel = module.get_function('generate_vertices')
+    state.generate_vertices_kernel = cp.RawKernel(code=code, backend='nvrtc', 
+            options=build_flags, name='generate_vertices')
 
 def build_mesh_accel(state):
     # Allocate temporary space for vertex generation.
@@ -265,6 +275,10 @@ def build_mesh_accel(state):
     # Build static triangulated sphere.
     build_vertex_generation_kernel(state)
     launch_generate_animated_vertices(state, AnimationMode.NONE)
+
+    #V = cp.asnumpy(state.d_temp_vertices)
+    #import trimesh
+    #trimesh.Trimesh(vertices=V, faces=np.arange(V.shape[0]).reshape(-1,3)).show()
 
     # Build an AS over the triangles.
     # We use un-indexed triangles so we can explode the sphere per triangle.

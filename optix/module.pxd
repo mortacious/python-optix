@@ -73,3 +73,4 @@ cdef class Module(OptixContextObject):
     cdef list _compile_flags
 
     #cpdef size_t c_obj(self)
+

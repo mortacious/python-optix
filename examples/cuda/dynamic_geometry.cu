@@ -100,6 +100,14 @@ extern "C" __global__ void __raygen__rg()
         static_cast< float >( idx.x ) / static_cast< float >( dim.x ),
         static_cast< float >( idx.y ) / static_cast< float >( dim.y )
     ) - 1.0f;
+    
+    if (idx.x == 0 && idx.y == 0 && idx.z == 0) {
+	    printf("ix=%u/%u, iy=%u/%u, width=%u, height=%u\n", idx.x, dim.x-1, idx.y, dim.y-1, params.width, params.height);
+	    printf("U: %f, %f, %f   V: %f, %f, %f,   W: %f, %f, %f,    eye: %f, %f, %f\n",
+		U.x, U.y, U.z, V.x, V.y, V.z, W.x, W.y, W.z, eye.x, eye.y, eye.z);
+	    printf("frame_buffer=%p, trav_handle=%p, subframe_index=%u\n", params.frame_buffer, params.trav_handle, params.subframe_index);
+    }
+
 
     const float3 direction = normalize( d.x * U + d.y * V + W );
     float3       payload_rgb = make_float3( 0.5f, 0.5f, 0.5f );
