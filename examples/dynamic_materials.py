@@ -47,7 +47,7 @@ class Params:
 
 
 class SampleState:
-    __slots__ = ['params', 'ctx', 'gas', 'ias', 'module',
+    __slots__ = ['params', 'ctx', 'gas', 'ias', 'instances', 'module',
                  'raygen_grp', 'miss_grp', 'hit_grps',
                  'raygen_sbt', 'miss_sbt', 'hit_sbts',
                  'sbt', 'pipeline', 'pipeline_opts']
@@ -116,15 +116,15 @@ g_colors = np.asarray([[1, 0, 0],
 
 # Left sphere
 g_material_index_0 = MaterialIndex(3)
-g_has_data_changed = False;
+g_has_data_changed = False
 
 # Middle sphere
 g_material_index_1 = MaterialIndex(2)
-g_has_offset_changed = False;
+g_has_offset_changed = False
 
 # Right sphere
 g_material_index_2 = MaterialIndex(3)
-g_has_sbt_changed = False;
+g_has_sbt_changed = False
 
 ##------------------------------------------------------------------------------
 ##
@@ -164,6 +164,7 @@ def build_ias(state):
         instance = ox.Instance(traversable=state.gas, instance_id=0, flags=ox.InstanceFlags.NONE,
                 sbt_offset=sbt_offsets[i], transform=transforms[i])
         instances.append(instance)
+    state.instances = instances
 
     build_input = ox.BuildInputInstanceArray(instances)
     state.ias = ox.AccelerationStructure(context=state.ctx, build_inputs=build_input)
@@ -173,6 +174,7 @@ def create_module(state):
     pipeline_opts = ox.PipelineCompileOptions(
             uses_motion_blur=False,
             traversable_graph_flags=ox.TraversableGraphFlags.ALLOW_SINGLE_LEVEL_INSTANCING,
+            uses_primitive_type_flags=ox.PrimitiveTypeFlags.CUSTOM,
             num_payload_values=3,
             num_attribute_values=3,
             exception_flags=ox.ExceptionFlags.DEBUG | ox.ExceptionFlags.TRACE_DEPTH | ox.ExceptionFlags.STACK_OVERFLOW,
