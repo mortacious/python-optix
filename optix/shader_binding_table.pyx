@@ -111,3 +111,4 @@ cdef class ShaderBindingTable(OptixObject):
             return array_to_device_memory(record, stream=stream), record.shape[0], record.strides[0]
         else:
             raise ValueError(f"Unsupported record type '{type(record)}'")
+

@@ -22,7 +22,6 @@ def  _aligned_itemsize( formats, alignment ):
         } )
     return round_up( temp_dtype.itemsize, alignment )
 
-
 def array_to_device_memory(numpy_array, stream=None):
     """
     Transfer a numpy array to cuda device memory. This does not generate a full cupy.ndarray, but an
