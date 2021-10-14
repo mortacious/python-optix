@@ -65,7 +65,7 @@ def display_stats(state_update_time, render_time, display_time):
     cur_time = glfw.get_time()
 
     display_stats.last_update_frames += 1
-    last_update_time = display_stats.last_update_time or cur_time - 1e-7
+    last_update_time = display_stats.last_update_time or cur_time - 0.5
     last_update_frames = display_stats.last_update_frames
     total_subframe_count = display_stats.total_subframe_count
 

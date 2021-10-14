@@ -1,7 +1,7 @@
 import numpy as np
 
-from optix.sutils.vecmath import length, normalize, cross
-from optix.sutils.properties import get_member, set_float, set_float3
+from optix.sutil.vecmath import length, normalize, cross
+from optix.sutil.properties import get_member, set_float, set_float3
 
 class Camera:
     """Implements a perspective camera."""

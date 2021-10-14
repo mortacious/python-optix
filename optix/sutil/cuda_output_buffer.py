@@ -5,7 +5,7 @@ import cupy as cp
 
 import OpenGL.GL as gl
 
-from optix.sutils.vecmath import vtype_to_dtype
+from optix.sutil.vecmath import vtype_to_dtype
 
 class BufferImageFormat(enum.Enum):
     UCHAR4=0

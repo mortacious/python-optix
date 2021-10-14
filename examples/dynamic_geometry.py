@@ -1,19 +1,21 @@
-import os, sys, enum, logging, collections
+import os, sys, enum, copy, logging, collections
 
 import numpy as np
 import cupy as cp
 import optix as ox
 import glfw, imgui
 
-from optix.sutils.gui import init_ui, display_stats
-from optix.sutils.gl_display import GLDisplay
-from optix.sutils.trackball import Trackball, TrackballViewMode
-from optix.sutils.cuda_output_buffer import CudaOutputBuffer, CudaOutputBufferType, BufferImageFormat
+from optix.sutil.gui import init_ui, display_stats
+from optix.sutil.gl_display import GLDisplay
+from optix.sutil.trackball import Trackball, TrackballViewMode
+from optix.sutil.cuda_output_buffer import CudaOutputBuffer, CudaOutputBufferType, BufferImageFormat
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 log = logging.getLogger()
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
+
+DEBUG=False
 
 #------------------------------------------------------------------------------
 # Local types
@@ -58,7 +60,8 @@ class DynamicGeometryState:
     __slots__ = ['params', 'time', 'ctx', 'module', 'pipeline', 'pipeline_opts',
             'raygen_grp', 'miss_grp', 'hit_grp', 'sbt',
             'generate_vertices_kernel', 'd_temp_vertices', 'last_exploding_sphere_rebuild_time',
-            'static_gas', 'deforming_gas', 'exploding_gas', 'ias',
+            'gas_build_input', 'static_gas', 'deforming_gas', 'exploding_gas',
+            'ias_build_input', 'ias',
             'trackball', 'camera_changed', 'mouse_button', 'resize_dirty', 'minimized']
 
     def __init__(self):
@@ -77,7 +80,7 @@ class DynamicGeometryState:
         return self.trackball.camera
 
     @property
-    def dimensions(self):
+    def launch_dimensions(self):
         return (int(self.params.width), int(self.params.height))
 
 class AnimationMode(enum.Enum):
@@ -203,7 +206,7 @@ def update_state(output_buffer, state):
 def launch_subframe(output_buffer, state):
     state.params.frame_buffer = output_buffer.map()
 
-    state.pipeline.launch(state.sbt, dimensions=state.dimensions,
+    state.pipeline.launch(state.sbt, dimensions=state.launch_dimensions,
             params=state.params.handle, stream=output_buffer.stream)
 
     output_buffer.unmap()
@@ -229,7 +232,7 @@ def init_camera_state(state):
 
 def create_context(state):
     logger = ox.Logger(log)
-    ctx = ox.DeviceContext(validation_mode=True, log_callback_function=logger, log_callback_level=4)
+    ctx = ox.DeviceContext(validation_mode=False, log_callback_function=logger, log_callback_level=4)
     ctx.cache_enabled = False
     state.ctx = ctx
 
@@ -246,8 +249,30 @@ def launch_generate_animated_vertices(state, animation_mode):
     generate_animated_vertices(state.d_temp_vertices, animation_mode, state.time, g_tessellation_resolution, g_tessellation_resolution)
 
 def update_mesh_accel(state):
+    # first sphere is static
+
+    # second sphere moves by updating its transform matrix
+    transform = state.ias_build_input.get_transform_view(1)
+    transform[1,-1] = np.sin(4*state.time)
+
+    # third sphere deforms
     launch_generate_animated_vertices(state, AnimationMode.DEFORM)
-    raise NotImplementedError
+    state.deforming_gas.update(state.gas_build_input)
+
+    # fourth sphere explodes
+    launch_generate_animated_vertices(state, AnimationMode.EXPLODE)
+
+    # we occasionally rebuild the exploding sphere to maintain AS quality
+    if state.time - state.last_exploding_sphere_rebuild_time > 1 / g_exploding_gas_rebuild_frequency:
+        state.last_exploding_sphere_rebuild_time = state.time
+        state.exploding_gas = ox.AccelerationStructure(state.ctx, state.gas_build_input,
+                compact=True, allow_update=True, random_vertex_access=True)
+        state.ias_build_input.instances[3].update_traversable(state.exploding_gas)
+        state.ias_build_input.update_instance(3)
+    else:
+        state.exploding_gas.update(state.gas_build_input)
+
+    state.ias.update(state.ias_build_input)
 
 def build_vertex_generation_kernel(state):
     cuda_source = os.path.join(script_dir, 'cuda', 'dynamic_geometry_vertex_generation.cu')
@@ -277,12 +302,15 @@ def build_mesh_accel(state):
 
     # Build an AS over the triangles.
     # We use un-indexed triangles so we can explode the sphere per triangle.
-    build_input = ox.BuildInputTriangleArray(state.d_temp_vertices, flags=[ox.GeometryFlags.NONE])
-    state.static_gas = ox.AccelerationStructure(state.ctx, build_input,
+    state.gas_build_input = ox.BuildInputTriangleArray(state.d_temp_vertices, flags=[ox.GeometryFlags.NONE])
+    state.static_gas = ox.AccelerationStructure(state.ctx, state.gas_build_input,
+            compact=True, allow_update=False, random_vertex_access=True)
+
+    state.deforming_gas = ox.AccelerationStructure(state.ctx, state.gas_build_input,
             compact=True, allow_update=True, random_vertex_access=True)
 
-    state.deforming_gas = state.static_gas
-    state.exploding_gas = state.static_gas
+    state.exploding_gas = ox.AccelerationStructure(state.ctx, state.gas_build_input,
+            compact=True, allow_update=True, random_vertex_access=True)
 
     traversables = [state.static_gas, state.static_gas,
                     state.deforming_gas, state.exploding_gas]
@@ -292,20 +320,25 @@ def build_mesh_accel(state):
                 sbt_offset=i, transform=g_instances[i])
         instances.append(instance)
 
-    build_input = ox.BuildInputInstanceArray(instances)
-    state.ias = ox.AccelerationStructure(context=state.ctx, build_inputs=build_input,
-            compact=True, allow_update=True)
+    state.ias_build_input = ox.BuildInputInstanceArray(instances)
+    state.ias = ox.AccelerationStructure(context=state.ctx,
+            build_inputs=state.ias_build_input, compact=True, allow_update=True)
     state.params.trav_handle = state.ias.handle
 
 
 def create_module(state):
+    if DEBUG:
+        exception_flags=ox.ExceptionFlags.DEBUG | ox.ExceptionFlags.TRACE_DEPTH | ox.ExceptionFlags.STACK_OVERFLOW,
+    else:
+        exception_flags=ox.ExceptionFlags.NONE
+
     pipeline_opts = ox.PipelineCompileOptions(
             uses_motion_blur=False,
             uses_primitive_type_flags = ox.PrimitiveTypeFlags.TRIANGLE,
             traversable_graph_flags=ox.TraversableGraphFlags.ALLOW_SINGLE_LEVEL_INSTANCING,
+            exception_flags=exception_flags,
             num_payload_values=3,
             num_attribute_values=2,
-            exception_flags=ox.ExceptionFlags.DEBUG | ox.ExceptionFlags.TRACE_DEPTH | ox.ExceptionFlags.STACK_OVERFLOW,
             pipeline_launch_params_variable_name="params")
 
     compile_opts = ox.ModuleCompileOptions(
@@ -328,7 +361,7 @@ def create_pipeline(state):
     program_grps = [state.raygen_grp, state.miss_grp, state.hit_grp]
 
     link_opts = ox.PipelineLinkOptions(max_trace_depth=1,
-                                       debug_level=ox.CompileDebugLevel.FULL)
+                                       debug_level=ox.CompileDebugLevel.LINEINFO)
 
     pipeline = ox.Pipeline(state.ctx,
                            compile_options=state.pipeline_opts,
@@ -410,7 +443,7 @@ if __name__ == '__main__':
 
         state.time = glfw.get_time() - tstart
 
-        #update_mesh_accel(state)
+        update_mesh_accel(state)
 
         update_state(output_buffer, state)
 

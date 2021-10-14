@@ -4,7 +4,7 @@ import numpy as np
 import OpenGL.GL as gl
 import OpenGL.GL.shaders
 
-from optix.sutils.cuda_output_buffer import BufferImageFormat
+from optix.sutil.cuda_output_buffer import BufferImageFormat
 
 class GLDisplay:
     vert_source = \

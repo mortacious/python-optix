@@ -436,6 +436,10 @@ cdef class Instance(OptixObject):
             raise ValueError(f"Too many entries in visibility mask. Got {visibility_mask.bit_length()} but supported are only {max_visibility_mask_bits}")
         self.instance.visibilityMask = visibility_mask
 
+    def update_traversable(self, AccelerationStructure traversable):
+        self.traversable = traversable
+        self.instance.traversableHandle = self.traversable.handle
+
     def __deepcopy__(self, memodict={}):
         from copy import deepcopy
         cls = self.__class__
@@ -479,7 +483,15 @@ cdef class BuildInputInstanceArray(BuildInputArray):
 
     cdef size_t num_elements(self):
         return self.build_input.numInstances
+    
+    def update_instance(self, index):
+        src_ptr = <size_t>&((<Instance>(self.instances[index])).instance)
+        dst_ptr = self._d_instances.ptr + index*sizeof(OptixInstance)
+        cp.cuda.runtime.memcpy(dst_ptr, src_ptr, sizeof(OptixInstance), cp.cuda.runtime.memcpyHostToDevice)
 
+    def get_transform_view(self, index):
+        device_ptr = cp.cuda.MemoryPointer(mem=self._d_instances.mem, offset=<int>index*sizeof(OptixInstance))
+        return cp.ndarray(shape=(3,4), dtype=np.float32, memptr=device_ptr)
 
 
 cdef class AccelerationStructure(OptixContextObject):
@@ -740,7 +752,7 @@ cdef class AccelerationStructure(OptixContextObject):
         result._build_flags = self._build_flags
         result._buffer_sizes = self._buffer_sizes
         result._instances = deepcopy(self._instances) # copy all instances and their AccelerationStructures first
-
+    
         buffer_size = round_up(self._buffer_sizes.outputSizeInBytes, 8) + 8
         result._gas_buffer = cp.cuda.alloc(buffer_size)
         cp.cuda.runtime.memcpy(result._gas_buffer.ptr, self._gas_buffer.ptr, buffer_size, cp.cuda.runtime.memcpyDeviceToDevice)
