@@ -28,13 +28,13 @@
 
 struct Params
 {
+    OptixTraversableHandle trav_handle;
     uchar4*                image;
     unsigned int           image_width;
     unsigned int           image_height;
     float                  radius;
     float3                 cam_eye;
     float3                 camera_u, camera_v, camera_w;
-    OptixTraversableHandle trav_handle;
 };
 
 

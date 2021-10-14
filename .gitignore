@@ -2,6 +2,7 @@
 __pycache__/
 build/
 dist/
+imgui.ini
 *.egg-info/
 .*/
 *.so

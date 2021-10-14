@@ -250,7 +250,9 @@ cdef class BuildInputCustomPrimitiveArray(BuildInputArray):
 
         self.build_input.aabbBuffers = self._d_aabb_buffer_ptrs.const_data()
         self.build_input.numPrimitives = shape[0]
-        self.build_input.strideInBytes = self._d_aabb_buffers[0].strides[0]
+        
+        # https://github.com/cupy/cupy/issues/5897
+        self.build_input.strideInBytes = 6*np.float32().itemsize
 
         self._flags.resize(num_sbt_records)
         if flags is None:
