@@ -62,7 +62,7 @@ class SampleState:
 
     @property
     def dimensions(self):
-        return (int(self.params.image_height), int(self.params.image_width))
+        return (int(self.params.image_width), int(self.params.image_height))
 
 
 class MaterialIndex:
@@ -154,14 +154,15 @@ def create_context(state):
 
 def build_gas(state):
     aabb = np.asarray([[-1.5, -1.5, -1.5, 1.5, 1.5, 1.5]], dtype=np.float32)
-    build_input = ox.BuildInputCustomPrimitiveArray(aabb_buffers=aabb, num_sbt_records=1)
-    state.gas = ox.AccelerationStructure(state.ctx, build_input, compact=True)
+    build_input = ox.BuildInputCustomPrimitiveArray(aabb_buffers=aabb, flags=[ox.GeometryFlags.DISABLE_ANYHIT])
+    state.gas = ox.AccelerationStructure(state.ctx, build_input)
     state.params.radius = 1.5
 
 def build_ias(state):
+    return
     instances = []
     for i in range(transforms.shape[0]):
-        instance = ox.Instance(traversable=state.gas, instance_id=0, flags=ox.InstanceFlags.NONE,
+        instance = ox.Instance(traversable=state.gas, instance_id=0, flags=ox.InstanceFlags.DISABLE_ANYHIT,
                 sbt_offset=sbt_offsets[i], transform=transforms[i])
         instances.append(instance)
     state.instances = instances
@@ -173,7 +174,7 @@ def build_ias(state):
 def create_module(state):
     pipeline_opts = ox.PipelineCompileOptions(
             uses_motion_blur=False,
-            traversable_graph_flags=ox.TraversableGraphFlags.ALLOW_SINGLE_LEVEL_INSTANCING,
+            traversable_graph_flags=ox.TraversableGraphFlags.ALLOW_SINGLE_GAS,
             uses_primitive_type_flags=ox.PrimitiveTypeFlags.CUSTOM,
             num_payload_values=3,
             num_attribute_values=3,
@@ -220,7 +221,7 @@ def create_pipeline(state):
                            compile_options=state.pipeline_opts,
                            link_options=link_opts,
                            program_groups=program_grps,
-                           max_traversable_graph_depth=2)
+                           max_traversable_graph_depth=1)
 
     pipeline.compute_stack_sizes(1,  # max_trace_depth
                                  0,  # max_cc_depth

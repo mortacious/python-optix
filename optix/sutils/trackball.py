@@ -2,7 +2,7 @@ import enum
 
 import numpy as np
 
-from optix.sutils.properties import get_member, set_bool, set_int, set_float, set_float3
+from optix.sutils.properties import get_member, set_bool, set_float, set_float3
 from optix.sutils.vecmath import dot, length, normalize
 from optix.sutils.camera import Camera
 
@@ -28,9 +28,8 @@ class Trackball:
     roll_speed = property(get_member('_roll_speed'), set_float('_roll_speed', 0.5))
     latitude = property(get_member('_latitude'), set_float('_latitude', 0.0))
     longitude = property(get_member('_longitude'), set_float('_longitude', 0.0))
-
-    previous_position_x = property(get_member('_previous_position_x'), set_int('_previous_position_x', 0))
-    previous_position_y = property(get_member('_previous_position_y'), set_int('_previous_position_y', 0))
+    previous_position_x = property(get_member('_previous_position_x'), set_float('_previous_position_x', 0))
+    previous_position_y = property(get_member('_previous_position_y'), set_float('_previous_position_y', 0))
 
     gimbal_lock = property(get_member('_gimbal_lock'), set_bool('_gimbal_lock', False))
     perform_tracking = property(get_member('_perform_tracking'), set_bool('_perform_tracking', False))
@@ -64,7 +63,6 @@ class Trackball:
     camera = property(_get_camera, _set_camera)
 
     def start_tracking(self, x, y):
-        x, y = int(x), int(y)
         self.previous_position_x = x
         self.previous_position_y = y
         self.perform_tracking = True
@@ -73,9 +71,11 @@ class Trackball:
         if not self._perform_tracking:
             return self.start_tracking(x, y)
 
-        x, y = int(x), int(y)
         delta_x = x - self.previous_position_x
         delta_y = y - self.previous_position_y
+
+        if delta_x == 0 and delta_y == 0:
+            return
 
         self.previous_position_x = x
         self.previous_position_y = y
@@ -85,7 +85,7 @@ class Trackball:
 
         self._update_camera()
 
-        if self.gimbal_lock:
+        if not self.gimbal_lock:
             self.reinitialize_orientation_from_camera()
             self.camera.up = self.w
 
@@ -133,6 +133,7 @@ class Trackball:
         self.v = v
         self.w = w
 
+        assert length(self.camera.look_at - self.camera.eye) != 0
         dir_ws = -normalize(self.camera.look_at - self.camera.eye)
 
         dirx = dot(dir_ws, u)

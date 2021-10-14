@@ -11,8 +11,9 @@ def length(x):
     return np.sqrt(dot(x, x))
 
 def normalize(x):
-    return x/length(x)
-
+    l = length(x)
+    assert l>0, x
+    return x/l
 
 def ctype_to_dtype(ctype):
     _ctype_to_dtype = {

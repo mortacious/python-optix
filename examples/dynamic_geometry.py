@@ -58,7 +58,7 @@ class DynamicGeometryState:
     __slots__ = ['params', 'time', 'ctx', 'module', 'pipeline', 'pipeline_opts',
             'raygen_grp', 'miss_grp', 'hit_grp', 'sbt',
             'generate_vertices_kernel', 'd_temp_vertices', 'last_exploding_sphere_rebuild_time',
-            'static_gas_handle', 'deforming_gas_handle', 'exploding_gas_handle', 'ias',
+            'static_gas', 'deforming_gas', 'exploding_gas', 'ias',
             'trackball', 'camera_changed', 'mouse_button', 'resize_dirty', 'minimized']
 
     def __init__(self):
@@ -78,7 +78,7 @@ class DynamicGeometryState:
 
     @property
     def dimensions(self):
-        return (int(self.params.height), int(self.params.width))
+        return (int(self.params.width), int(self.params.height))
 
 class AnimationMode(enum.Enum):
     NONE = 0
@@ -101,17 +101,17 @@ g_diffuse_colors = np.asarray([
 INST_COUNT = g_diffuse_colors.shape[0]
 
 g_instances = np.asarray([
-    [1, 0, 0, -4.5, 
-     0, 1, 0, 0, 
+    [1, 0, 0, -4.5,
+     0, 1, 0, 0,
      0, 0, 1, 0],
-    [1, 0, 0, -1.5, 
-     0, 1, 0, 0, 
+    [1, 0, 0, -1.5,
+     0, 1, 0, 0,
      0, 0, 1, 0],
-    [1, 0, 0, 1.5, 
-     0, 1, 0, 0, 
+    [1, 0, 0, 1.5,
+     0, 1, 0, 0,
      0, 0, 1, 0],
-    [1, 0, 0, 4.5, 
-     0, 1, 0, 0, 
+    [1, 0, 0, 4.5,
+     0, 1, 0, 0,
      0, 0, 1, 0],
 ], dtype=np.float32).reshape(INST_COUNT, 3, 4)
 
@@ -124,7 +124,7 @@ def mouse_button_callback(window, button, action, mods):
     (x, y) = glfw.get_cursor_pos(window)
     if action is glfw.PRESS:
         state.mouse_button = button
-        state.trackball.start_tracking(int(x), int(y))
+        state.trackball.start_tracking(x, y)
     else:
         state.mouse_button = -1
 
@@ -163,7 +163,7 @@ def key_callback(window, key, scancode, action, mods):
 
 def scroll_callback(window, xscroll, yscroll):
     state = glfw.get_window_user_pointer(window)
-    if state.trackball.wheel_event(int(yscroll)):
+    if state.trackball.wheel_event(yscroll):
         state.camera_changed = True
 
 #------------------------------------------------------------------------------
@@ -202,11 +202,6 @@ def update_state(output_buffer, state):
 
 def launch_subframe(output_buffer, state):
     state.params.frame_buffer = output_buffer.map()
-    
-    print('LAUNCH SUBFRAME')
-    print('state.dimensions', state.dimensions)
-    print(f'state.output_buffer: width={output_buffer.width}  height={output_buffer.height}')
-    print(f'state.params\n{state.params}')
 
     state.pipeline.launch(state.sbt, dimensions=state.dimensions,
             params=state.params.handle, stream=output_buffer.stream)
@@ -230,7 +225,7 @@ def init_camera_state(state):
     trackball = state.trackball
     trackball.move_speed = 10.0
     trackball.set_reference_frame([1,0,0], [0,0,1], [0,1,0])
-    trackball.gimbal_lock = True
+    trackball.reinitialize_orientation_from_camera()
 
 def create_context(state):
     logger = ox.Logger(log)
@@ -257,13 +252,13 @@ def update_mesh_accel(state):
 def build_vertex_generation_kernel(state):
     cuda_source = os.path.join(script_dir, 'cuda', 'dynamic_geometry_vertex_generation.cu')
     example_include_path = os.path.dirname(cuda_source)
-    
+
     build_flags = ox.module.get_default_nvrtc_compile_flags() + (f'-I{example_include_path}',)
 
     with open(cuda_source, 'r') as f:
         code = f.read()
 
-    state.generate_vertices_kernel = cp.RawKernel(code=code, backend='nvrtc', 
+    state.generate_vertices_kernel = cp.RawKernel(code=code, backend='nvrtc',
             options=build_flags, name='generate_vertices')
 
 def build_mesh_accel(state):
@@ -283,14 +278,14 @@ def build_mesh_accel(state):
     # Build an AS over the triangles.
     # We use un-indexed triangles so we can explode the sphere per triangle.
     build_input = ox.BuildInputTriangleArray(state.d_temp_vertices, flags=[ox.GeometryFlags.NONE])
-    state.static_gas_handle = ox.AccelerationStructure(state.ctx, build_input,
+    state.static_gas = ox.AccelerationStructure(state.ctx, build_input,
             compact=True, allow_update=True, random_vertex_access=True)
 
-    state.deforming_gas_handle = state.static_gas_handle
-    state.exploding_gas_handle = state.static_gas_handle
+    state.deforming_gas = state.static_gas
+    state.exploding_gas = state.static_gas
 
-    traversables = [state.static_gas_handle, state.static_gas_handle,
-                    state.deforming_gas_handle, state.exploding_gas_handle]
+    traversables = [state.static_gas, state.static_gas,
+                    state.deforming_gas, state.exploding_gas]
     instances = []
     for i in range(INST_COUNT):
         instance = ox.Instance(traversable=traversables[i], instance_id=0, flags=ox.InstanceFlags.NONE,

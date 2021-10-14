@@ -29,8 +29,10 @@ class Camera:
     direction = property(_get_direction, _set_direction)
 
     def uvw_frame(self):
+        # do not normalize W -- it implies focal length
         W = self.look_at - self.eye
         wlen = length(W)
+        assert wlen > 0, (self.eye, self.look_at)
 
         U = normalize(cross(W, self.up))
         V = normalize(cross(U, W))

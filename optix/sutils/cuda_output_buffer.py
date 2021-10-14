@@ -119,7 +119,7 @@ class CudaOutputBuffer:
         buffer_type = self.buffer_type
 
         dtype = self.pixel_format
-        shape = (self.width, self.height)
+        shape = (self.height, self.width)
 
         if buffer_type is CudaOutputBufferType.CUDA_DEVICE:
             self._host_buffer = np.empty(shape=shape, dtype=dtype)

@@ -37,6 +37,8 @@ def init_ui(window_title, width, height):
     if not window:
         raise RuntimeError("Could not initialize Window")
 
+    glfw.swap_interval(0)
+
     init_gl()
     impl = init_imgui(window)
 
@@ -62,20 +64,20 @@ def display_stats(state_update_time, render_time, display_time):
 
     cur_time = glfw.get_time()
 
+    display_stats.last_update_frames += 1
     last_update_time = display_stats.last_update_time or cur_time - 1e-7
     last_update_frames = display_stats.last_update_frames
     total_subframe_count = display_stats.total_subframe_count
 
     dt = cur_time - last_update_time
-    display_stats.last_update_frames += 1
 
     do_update = (dt > display_update_min_interval_time) or (total_subframe_count == 0)
 
     if do_update:
         fps = last_update_frames / dt
-        state_ms = 1000.0 * state_update_time
-        render_ms = 1000.0 * render_time
-        display_ms = 1000.0 * display_time
+        state_ms = 1000.0 * state_update_time / last_update_frames
+        render_ms = 1000.0 * render_time / last_update_frames
+        display_ms = 1000.0 * display_time / last_update_frames
 
         display_stats.last_update_time = cur_time
         display_stats.last_update_frames = 0

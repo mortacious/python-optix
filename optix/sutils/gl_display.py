@@ -1,4 +1,4 @@
-
+import ctypes
 import numpy as np
 
 import OpenGL.GL as gl
@@ -11,13 +11,13 @@ class GLDisplay:
 """
 #version 330 core
 
-layout(location = 0) in vec3 vertexPosition_modelspace;
+layout(location = 0) in vec3 position;
 out vec2 UV;
 
 void main()
 {
-    gl_Position =  vec4(vertexPosition_modelspace,1);
-    UV = (vec2(vertexPosition_modelspace.x, vertexPosition_modelspace.y)+vec2(1,1))/2.0;
+    gl_Position =  vec4(position, 1);
+    UV = (vec2(position.x, position.y) + vec2(1,1)) / 2.0;
 }
 """
 
@@ -26,14 +26,13 @@ void main()
 #version 330 core
 
 in vec2 UV;
-out vec3 color;
+layout(location=0) out vec4 color;
 
 uniform sampler2D render_tex;
-uniform bool correct_gamma;
 
 void main()
 {
-    color = texture(render_tex, UV).xyz;
+    color = texture(render_tex, UV).xyzw;
 }
 """
 
@@ -90,6 +89,7 @@ void main()
         gl.glViewport(0, 0, framebuf_res_x, framebuf_res_y)
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
         gl.glUseProgram(self._program)
+        gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_FILL)
 
         gl.glActiveTexture(gl.GL_TEXTURE0)
         gl.glBindTexture(gl.GL_TEXTURE_2D, self._render_tex)
@@ -109,7 +109,6 @@ void main()
 
         image_format = self._image_format
         if(image_format == BufferImageFormat.UCHAR4):
-            # input is assumed to be in srgb since it is only 1 byte per channel in size
             gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGBA8, screen_res_x, screen_res_y,
                             0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, None)
             convert_to_srgb = False
@@ -120,7 +119,12 @@ void main()
             gl.glTexImage2D(gl.GL_TEXTURE_2D, 0, gl.GL_RGBA32F, screen_res_x, screen_res_y,
                             0, gl.GL_RGBA, gl.GL_FLOAT, None)
         else:
-            raise NotImplementedError("Unknown buffer format.")
+            raise NotImplementedError(f"Unknown image format {image_format}.")
+
+        if convert_to_srgb:
+            gl.glEnable(gl.GL_FRAMEBUFFER_SRGB)
+        else:
+            gl.glDisable(gl.GL_FRAMEBUFFER_SRGB)
 
         gl.glBindBuffer(gl.GL_PIXEL_UNPACK_BUFFER, 0)
         gl.glUniform1i(self._render_tex_uniforloc, 0)
@@ -128,14 +132,8 @@ void main()
         # 1st attribute buffer : vertices
         gl.glEnableVertexAttribArray(0)
         gl.glBindBuffer(gl.GL_ARRAY_BUFFER, self._quad_vertex_buffer)
-        gl.glVertexAttribPointer(0, 3, gl.GL_FLOAT, gl.GL_FALSE, 0, 0)
-
-        if convert_to_srgb:
-            gl.glEnable(gl.GL_FRAMEBUFFER_SRGB)
-        else:
-            gl.glDisable(gl.GL_FRAMEBUFFER_SRGB)
-
+        gl.glVertexAttribPointer(0, 3, gl.GL_FLOAT, gl.GL_FALSE, 0, ctypes.c_void_p(0))
         gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6)
-
         gl.glDisableVertexAttribArray(0)
+
         gl.glDisable(gl.GL_FRAMEBUFFER_SRGB)
