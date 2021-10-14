@@ -6,11 +6,11 @@ import optix as ox
 
 from PIL import Image, ImageOps
 
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 log = logging.getLogger()
 img_size = (1024, 768)
-
-script_dir = os.path.dirname(os.path.abspath(__file__))
 
 def compute_spheres_bbox(centers, radii):
     out = cp.empty((centers.shape[0], 6), dtype='f4')

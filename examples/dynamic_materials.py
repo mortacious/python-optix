@@ -1,8 +1,9 @@
 import os, sys, logging, collections
 
-import numpy as np
 import cupy as cp
+import numpy as np
 import optix as ox
+
 import glfw, imgui
 
 from optix.sutil.gui import init_ui, display_text
@@ -10,10 +11,12 @@ from optix.sutil.camera import Camera
 from optix.sutil.gl_display import GLDisplay
 from optix.sutil.cuda_output_buffer import CudaOutputBuffer, CudaOutputBufferType, BufferImageFormat
 
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 log = logging.getLogger()
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
+DEBUG=False
 
 
 class Params:
@@ -174,13 +177,18 @@ def build_ias(state):
     state.params.trav_handle = state.ias.handle
 
 def create_module(state):
+    if DEBUG:
+        exception_flags=ox.ExceptionFlags.DEBUG | ox.ExceptionFlags.TRACE_DEPTH | ox.ExceptionFlags.STACK_OVERFLOW,
+    else:
+        exception_flags=ox.ExceptionFlags.NONE
+
     pipeline_opts = ox.PipelineCompileOptions(
             uses_motion_blur=False,
             traversable_graph_flags=ox.TraversableGraphFlags.ALLOW_SINGLE_LEVEL_INSTANCING,
             uses_primitive_type_flags=ox.PrimitiveTypeFlags.CUSTOM,
             num_payload_values=3,
             num_attribute_values=3,
-            exception_flags=ox.ExceptionFlags.DEBUG | ox.ExceptionFlags.TRACE_DEPTH | ox.ExceptionFlags.STACK_OVERFLOW,
+            exception_flags=exception_flags,
             pipeline_launch_params_variable_name="params")
 
     compile_opts = ox.ModuleCompileOptions(
@@ -317,7 +325,7 @@ def update_sbt_header(state):
     # The right sphere will use the next compiled program group.
     material_index = state.material_index_2.nextval()
 
-    #state.hit_grps.update_program_group(3, state.hit_grps[3 + material_index])
+    state.hit_sbts.update_program_group(3, state.hit_grps[3 + material_index])
 
     state.sbt = ox.ShaderBindingTable(raygen_record=state.raygen_sbt, miss_records=state.miss_sbt,
             hitgroup_records=state.hit_sbts)

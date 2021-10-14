@@ -1,15 +1,20 @@
+import os, sys, logging
+
 import optix as ox
 import cupy as cp
 import numpy as np
+
 from PIL import Image, ImageOps
-import logging
-import sys
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 log = logging.getLogger()
 
 def create_module(ctx, pipeline_opts):
     compile_opts = ox.ModuleCompileOptions(debug_level=ox.CompileDebugLevel.LINEINFO)
-    module = ox.Module(ctx, 'cuda/hello.cu', compile_opts, pipeline_opts)
+    source = os.path.join(script_dir, 'cuda', 'hello.cu')
+    module = ox.Module(ctx, source, compile_opts, pipeline_opts)
     return module
 
 

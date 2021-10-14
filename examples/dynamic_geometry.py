@@ -1,8 +1,9 @@
-import os, sys, enum, copy, logging, collections
+import os, sys, enum, logging, collections
 
-import numpy as np
 import cupy as cp
+import numpy as np
 import optix as ox
+
 import glfw, imgui
 
 from optix.sutil.gui import init_ui, display_stats
@@ -10,10 +11,10 @@ from optix.sutil.gl_display import GLDisplay
 from optix.sutil.trackball import Trackball, TrackballViewMode
 from optix.sutil.cuda_output_buffer import CudaOutputBuffer, CudaOutputBufferType, BufferImageFormat
 
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 log = logging.getLogger()
-
-script_dir = os.path.dirname(os.path.abspath(__file__))
 
 DEBUG=False
 
@@ -83,10 +84,12 @@ class DynamicGeometryState:
     def launch_dimensions(self):
         return (int(self.params.width), int(self.params.height))
 
+
 class AnimationMode(enum.Enum):
     NONE = 0
     DEFORM = 1
     EXPLODE = 2
+
 
 #------------------------------------------------------------------------------
 # Scene data
