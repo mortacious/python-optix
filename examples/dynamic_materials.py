@@ -178,7 +178,7 @@ def build_ias(state):
 
 def create_module(state):
     if DEBUG:
-        exception_flags=ox.ExceptionFlags.DEBUG | ox.ExceptionFlags.TRACE_DEPTH | ox.ExceptionFlags.STACK_OVERFLOW,
+        exception_flags=ox.ExceptionFlags.DEBUG | ox.ExceptionFlags.TRACE_DEPTH | ox.ExceptionFlags.STACK_OVERFLOW
     else:
         exception_flags=ox.ExceptionFlags.NONE
 
