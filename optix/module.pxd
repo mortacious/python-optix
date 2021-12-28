@@ -2,9 +2,10 @@ from .base cimport OptixObject
 from .common cimport OptixResult, OptixModule
 from .context cimport OptixDeviceContext, OptixContextObject
 from .build cimport OptixPrimitiveType
-from .pipeline cimport OptixPipelineCompileOptions
+from .pipeline cimport OptixPipelineCompileOptions, OptixCompileDebugLevel
 
 cdef extern from "optix_includes.h" nogil:
+
     cdef OptixResult optixInit()
 
     cdef size_t OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT
@@ -17,12 +18,6 @@ cdef extern from "optix_includes.h" nogil:
         OPTIX_COMPILE_OPTIMIZATION_LEVEL_3
 
 
-    cdef enum OptixCompileDebugLevel:
-        OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
-        OPTIX_COMPILE_DEBUG_LEVEL_NONE,
-        OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO,
-        OPTIX_COMPILE_DEBUG_LEVEL_FULL
-
 
     cdef struct OptixModuleCompileBoundValueEntry:
         size_t pipelineParamOffsetInBytes
@@ -31,17 +26,55 @@ cdef extern from "optix_includes.h" nogil:
         const char* annotation
 
 
-    cdef struct OptixModuleCompileOptions:
-        int maxRegisterCount
-        OptixCompileOptimizationLevel optLevel
-        OptixCompileDebugLevel 	debugLevel
-        const OptixModuleCompileBoundValueEntry* boundValues
-        unsigned int numBoundValues
+    IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 3:  # switch to new version
+        cdef enum OptixPayloadType:
+            OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_NONE,
+            OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ,
+            OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_WRITE,
+            OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ_WRITE,
+            OPTIX_PAYLOAD_SEMANTICS_CH_NONE,
+            OPTIX_PAYLOAD_SEMANTICS_CH_READ,
+            OPTIX_PAYLOAD_SEMANTICS_CH_WRITE,
+            OPTIX_PAYLOAD_SEMANTICS_CH_READ_WRITE,
+            OPTIX_PAYLOAD_SEMANTICS_MS_NONE,
+            OPTIX_PAYLOAD_SEMANTICS_MS_READ,
+            OPTIX_PAYLOAD_SEMANTICS_MS_WRITE,
+            OPTIX_PAYLOAD_SEMANTICS_MS_READ_WRITE,
+            OPTIX_PAYLOAD_SEMANTICS_AH_NONE,
+            OPTIX_PAYLOAD_SEMANTICS_AH_READ,
+            OPTIX_PAYLOAD_SEMANTICS_AH_WRITE,
+            OPTIX_PAYLOAD_SEMANTICS_AH_READ_WRITE,
+            OPTIX_PAYLOAD_SEMANTICS_IS_NONE,
+            OPTIX_PAYLOAD_SEMANTICS_IS_READ,
+            OPTIX_PAYLOAD_SEMANTICS_IS_WRITE,
+            OPTIX_PAYLOAD_SEMANTICS_IS_READ_WRITE,
+
+        cdef struct OptixModuleCompileOptions:
+            int maxRegisterCount
+            OptixCompileOptimizationLevel optLevel
+            OptixCompileDebugLevel 	debugLevel
+            const OptixModuleCompileBoundValueEntry* boundValues
+            unsigned int numBoundValues
+            unsigned int numPayloadTypes
+            OptixPayloadType* payloadTypes
+
+        cdef struct OptixBuiltinISOptions:
+            OptixPrimitiveType builtinISModuleType
+            int usesMotionBlur
+            unsigned int buildFlags
+            unsigned int curveEndcapFlags
+    ELSE:
+        cdef struct OptixModuleCompileOptions:
+            int maxRegisterCount
+            OptixCompileOptimizationLevel optLevel
+            OptixCompileDebugLevel 	debugLevel
+            const OptixModuleCompileBoundValueEntry* boundValues
+            unsigned int numBoundValues
 
 
-    cdef struct OptixBuiltinISOptions:
-        OptixPrimitiveType builtinISModuleType
-        int usesMotionBlur
+        cdef struct OptixBuiltinISOptions:
+            OptixPrimitiveType builtinISModuleType
+            int usesMotionBlur
 
 
     OptixResult optixModuleCreateFromPTX(OptixDeviceContext context,

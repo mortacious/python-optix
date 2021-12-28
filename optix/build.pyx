@@ -31,26 +31,38 @@ class GeometryFlags(IntEnum):
     REQUIRE_SINGLE_ANYHIT_CALL = OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL
 
 
-class PrimitiveType(IntEnum):
-    """
-    Wraps the OptixPrimitiveType enum.
-    """
-    CUSTOM = OPTIX_PRIMITIVE_TYPE_CUSTOM,
-    ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_ROUND_QUADRATIC_BSPLINE,
-    ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE,
-    ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR,
-    TRIANGLE = OPTIX_PRIMITIVE_TYPE_TRIANGLE
+IF _OPTIX_VERSION_MAJOR == 4 and _OPTIX_VERSION_MINOR > 3:  # switch to new instance flags
+    class PrimitiveType(IntEnum):
+        """
+        Wraps the OptixPrimitiveType enum.
+        """
+        CUSTOM = OPTIX_PRIMITIVE_TYPE_CUSTOM,
+        ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_ROUND_QUADRATIC_BSPLINE,
+        ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE,
+        ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR,
+        ROUND_CATMULLROM = OPTIX_PRIMITIVE_TYPE_ROUND_CATMULLROM,
+        TRIANGLE = OPTIX_PRIMITIVE_TYPE_TRIANGLE
+ELSE:
+    class PrimitiveType(IntEnum):
+        """
+        Wraps the OptixPrimitiveType enum.
+        """
+        CUSTOM = OPTIX_PRIMITIVE_TYPE_CUSTOM,
+        ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_ROUND_QUADRATIC_BSPLINE,
+        ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE,
+        ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR,
+        TRIANGLE = OPTIX_PRIMITIVE_TYPE_TRIANGLE
 
-class InstanceFlags(IntFlag):
-    """
-    Wraps the OptixInstanceFlags enum.
-    """
-    NONE = OPTIX_INSTANCE_FLAG_NONE,
-    DISABLE_TRIANGLE_FACE_CULLING = OPTIX_INSTANCE_FLAG_DISABLE_TRIANGLE_FACE_CULLING,
-    FLIP_TRIANGLE_FACING = OPTIX_INSTANCE_FLAG_FLIP_TRIANGLE_FACING,
-    DISABLE_ANYHIT = OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT,
-    ENFORCE_ANYHIT = OPTIX_INSTANCE_FLAG_ENFORCE_ANYHIT,
-    DISABLE_TRANSFORM = OPTIX_INSTANCE_FLAG_DISABLE_TRANSFORM
+
+    class InstanceFlags(IntFlag):
+        """
+        Wraps the OptixInstanceFlags enum.
+        """
+        NONE = OPTIX_INSTANCE_FLAG_NONE,
+        DISABLE_TRIANGLE_FACE_CULLING = OPTIX_INSTANCE_FLAG_DISABLE_TRIANGLE_FACE_CULLING,
+        FLIP_TRIANGLE_FACING = OPTIX_INSTANCE_FLAG_FLIP_TRIANGLE_FACING,
+        DISABLE_ANYHIT = OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT,
+        ENFORCE_ANYHIT = OPTIX_INSTANCE_FLAG_ENFORCE_ANYHIT,
 
 
 cdef class BuildInputArray(OptixObject):
@@ -382,6 +394,9 @@ cdef class BuildInputCurveArray(BuildInputArray):
             self.build_input.flag = flags.valuesbtIndexOffsetBuffer
 
         self.build_input.primitiveIndexOffset = primitive_index_offset
+
+        IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 3:  # TODO expose these!
+            self.build_input.endcapFlags = 0
 
     cdef void prepare_build_input(self, OptixBuildInput * build_input) except *:
         build_input.type = OPTIX_BUILD_INPUT_TYPE_CURVES

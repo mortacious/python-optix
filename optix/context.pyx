@@ -6,6 +6,12 @@ import cupy as cp
 
 optix_init()
 
+OPTIX_VERSION = _OPTIX_VERSION
+
+def optix_version():
+    return _OPTIX_VERSION_MAJOR, _OPTIX_VERSION_MINOR, _OPTIX_VERSION_MICRO
+
+
 cdef class _LogWrapper:
     def __init__(self, log_function):
         self.log_function = log_function

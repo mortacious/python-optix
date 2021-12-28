@@ -16,16 +16,6 @@ from .shader_binding_table cimport ShaderBindingTable
 optix_init()
 
 
-class CompileDebugLevel(IntEnum):
-    """
-    Wraps the OptixCompileDebugLevel enum.
-    """
-    DEFAULT = OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
-    NONE = OPTIX_COMPILE_DEBUG_LEVEL_NONE,
-    LINEINFO = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO,
-    FULL = OPTIX_COMPILE_DEBUG_LEVEL_FULL
-
-
 class ExceptionFlags(IntFlag):
     """
     Wraps the OptixExceptionFlags enum.
@@ -46,16 +36,48 @@ class TraversableGraphFlags(IntFlag):
     ALLOW_SINGLE_LEVEL_INSTANCING = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING
 
 
-class PrimitiveTypeFlags(IntFlag):
-    """
-    Wraps the OptixPrimitiveTypeFlags enum.
-    """
-    DEFAULT = 0, # corresponds to CUSTOM | TRIANGLE
-    CUSTOM = OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM,
-    ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE,
-    ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
-    ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR,
-    TRIANGLE = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE
+IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 3:  # switch to new instance flags
+    class CompileDebugLevel(IntEnum):
+        """
+        Wraps the OptixCompileDebugLevel enum.
+        """
+        DEFAULT = OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
+        NONE = OPTIX_COMPILE_DEBUG_LEVEL_NONE,
+        MINIMAL = OPTIX_COMPILE_DEBUG_LEVEL_MINIMAL,
+        MODERATE = OPTIX_COMPILE_DEBUG_LEVEL_MODERATE,
+        FULL = OPTIX_COMPILE_DEBUG_LEVEL_FULL
+
+    class PrimitiveTypeFlags(IntFlag):
+        """
+        Wraps the OptixPrimitiveTypeFlags enum.
+        """
+        DEFAULT = 0, # corresponds to CUSTOM | TRIANGLE
+        CUSTOM = OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM,
+        ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE,
+        ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
+        ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR,
+        ROUND_CATMULLROM = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CATMULLROM,
+        TRIANGLE = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE
+ELSE:
+    class CompileDebugLevel(IntEnum):
+        """
+        Wraps the OptixCompileDebugLevel enum.
+        """
+        DEFAULT = OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
+        NONE = OPTIX_COMPILE_DEBUG_LEVEL_NONE,
+        LINEINFO = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO,
+        FULL = OPTIX_COMPILE_DEBUG_LEVEL_FULL
+
+    class PrimitiveTypeFlags(IntFlag):
+        """
+        Wraps the OptixPrimitiveTypeFlags enum.
+        """
+        DEFAULT = 0, # corresponds to CUSTOM | TRIANGLE
+        CUSTOM = OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM,
+        ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE,
+        ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
+        ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR,
+        TRIANGLE = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE
 
 
 cdef class PipelineCompileOptions(OptixObject):

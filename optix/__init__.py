@@ -1,4 +1,4 @@
-from .context import DeviceContext
+from .context import DeviceContext, optix_version
 from .build import *
 from .module import Module, ModuleCompileOptions, CompileOptimizationLevel, CompileDebugLevel
 from .program_group import ProgramGroup

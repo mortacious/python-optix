@@ -18,7 +18,7 @@ def create_acceleration_structure(ctx, vertices):
 
 
 def create_module(ctx, pipeline_opts):
-    compile_opts = ox.ModuleCompileOptions(debug_level=ox.CompileDebugLevel.LINEINFO)
+    compile_opts = ox.ModuleCompileOptions(debug_level=ox.CompileDebugLevel.FULL, opt_level=ox.CompileOptimizationLevel.LEVEL_0)
     module = ox.Module(ctx, 'cuda/triangle.cu', compile_opts, pipeline_opts)
     return module
 

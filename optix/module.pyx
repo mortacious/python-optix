@@ -36,6 +36,10 @@ cdef class ModuleCompileOptions(OptixObject):
         self.compile_options.numBoundValues = 0
         self.compile_options.boundValues = NULL # currently not supported
 
+        IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 3:  # TODO expose these!
+            self.compile_options.numPayloadTypes = 0
+            self.compile_options.payloadTypes = NULL
+
     @property
     def max_register_count(self):
         return self.compile_options.maxRegisterCount
