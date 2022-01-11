@@ -84,6 +84,8 @@ IF _OPTIX_VERSION > 70300:
             Execute the Task. If more parallel work is found, it will be returned as a new list of Task objects.
             The list has a maximum size of max_additional_tasks.
 
+            Node, that each Task can only be executed by a single thread.
+
             Parameters
             ----------
             max_additional_tasks: int
