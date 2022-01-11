@@ -19,7 +19,6 @@ cdef extern from "optix_includes.h" nogil:
         OPTIX_COMPILE_OPTIMIZATION_LEVEL_3
 
 
-
     cdef struct OptixModuleCompileBoundValueEntry:
         size_t pipelineParamOffsetInBytes
         size_t sizeInBytes
@@ -101,14 +100,35 @@ cdef extern from "optix_includes.h" nogil:
                                         OptixModule *builtinModule)
 
 
-IF _OPTIX_VERSION > 70300:  # switch to new version
-    cdef class ModuleCompileOptions(OptixObject):
-        cdef OptixModuleCompileOptions compile_options
-        cdef vector[OptixPayloadType] payload_types
-        cdef vector[vector[unsigned int]] payload_values # WTF!
-ELSE:
-    cdef class ModuleCompileOptions(OptixObject):
-        cdef OptixModuleCompileOptions compile_options
+    IF _OPTIX_VERSION > 70300:  # switch to new version
+        ctypedef struct OptixTask:
+            pass
+
+        cdef enum OptixModuleCompileState:
+            OPTIX_MODULE_COMPILE_STATE_NOT_STARTED
+            OPTIX_MODULE_COMPILE_STATE_STARTED
+            OPTIX_MODULE_COMPILE_STATE_IMPENDING_FAILURE
+            OPTIX_MODULE_COMPILE_STATE_FAILED
+            OPTIX_MODULE_COMPILE_STATE_COMPLETED
+
+        cdef OptixResult optixModuleGetCompilationState(OptixModule module,
+                                                        OptixModuleCompileState * state)
+
+        cdef OptixResult optixModuleCreateFromPTXWithTasks(OptixDeviceContext context,
+                                                           const OptixModuleCompileOptions * moduleCompileOptions,
+                                                           const OptixPipelineCompileOptions * pipelineCompileOptions,
+                                                           const char * PTX,
+                                                           size_t PTXsize,
+                                                           char * logString,
+                                                           size_t * logStringSize,
+                                                           OptixModule * module,
+                                                           OptixTask * firstTask)
+
+        cdef OptixResult optixTaskExecute(OptixTask task,
+                                     OptixTask * additionalTasks,
+                                     unsigned int maxNumAdditionalTasks,
+                                     unsigned int *numAdditionalTasksCreated)
+
 
 cdef class BuiltinISOptions(OptixObject):
     cdef OptixBuiltinISOptions options
@@ -117,4 +137,15 @@ cdef class Module(OptixContextObject):
     cdef OptixModule module
     cdef list _compile_flags
 
-    #cpdef size_t c_obj(self)
+IF _OPTIX_VERSION > 70300:  # switch to new version
+    cdef class ModuleCompileOptions(OptixObject):
+        cdef OptixModuleCompileOptions compile_options
+        cdef vector[OptixPayloadType] payload_types
+        cdef vector[vector[unsigned int]] payload_values # WTF!
+
+    cdef class Task(OptixObject):
+        cdef OptixTask task
+        cdef Module module
+ELSE:
+    cdef class ModuleCompileOptions(OptixObject):
+        cdef OptixModuleCompileOptions compile_options

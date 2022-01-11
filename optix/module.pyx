@@ -10,6 +10,7 @@ from .pipeline import CompileDebugLevel
 from .build import PrimitiveType, BuildFlags, CurveEndcapFlags
 from .common import ensure_iterable
 from libc.stdint cimport uintptr_t
+from libcpp.vector cimport vector
 
 optix_init()
 
@@ -50,10 +51,68 @@ IF _OPTIX_VERSION > 70300:
         IS_READ = OPTIX_PAYLOAD_SEMANTICS_IS_READ,
         IS_WRITE = OPTIX_PAYLOAD_SEMANTICS_IS_WRITE,
         IS_READ_WRITE = OPTIX_PAYLOAD_SEMANTICS_IS_READ_WRITE
+
+    class ModuleCompileState(IntFlag):
+        NOT_STARTED = OPTIX_MODULE_COMPILE_STATE_NOT_STARTED,
+        STARTED = OPTIX_MODULE_COMPILE_STATE_STARTED,
+        IMPENDING_FAILURE = OPTIX_MODULE_COMPILE_STATE_IMPENDING_FAILURE,
+        FAILED = OPTIX_MODULE_COMPILE_STATE_FAILED,
+        COMPLETED = OPTIX_MODULE_COMPILE_STATE_COMPLETED,
+
+
+    cdef class Task(OptixObject):
+        """
+        Class to represent a parallel Task to compile an OptiX module.
+        A Task can be executed in parallel by e.g. a thread pool to handle lots of module compilations concurrently.
+        It is only valid as long as the corresponding module exists, therefore in this wrapper a reference to the module
+        if stored.
+
+        Note, that a Task is not supposed to be created by the user directly, but provided by the create_as_task method
+        of the Module class.
+
+        Parameters
+        ----------
+        module: Module
+            The module this Task belongs to.
+        """
+        def __init__(self, Module module):
+            self.module = module
+            self.task = <OptixTask>NULL
+
+        def execute(self, max_additional_tasks=2):
+            """
+            Execute the Task. If more parallel work is found, it will be returned as a new list of Task objects.
+            The list has a maximum size of max_additional_tasks.
+
+            Parameters
+            ----------
+            max_additional_tasks: int
+                The maximum number of new Tasks to create from this one
+
+            Returns
+            -------
+            tasks: List[Task]
+                The newly created tasks if any
+            """
+            cdef vector[OptixTask] additional_tasks
+            cdef unsigned int i
+            cdef unsigned int additional_tasks_created = 0
+            cdef unsigned int max_num_additional_tasks = max_additional_tasks
+
+            with nogil:
+                additional_tasks.resize(max_num_additional_tasks)
+                optix_check_return(optixTaskExecute(self.task, additional_tasks.data(), max_num_additional_tasks, &additional_tasks_created))
+
+            cdef list tasks = []
+            for i in range(additional_tasks_created):
+                t = Task(self.module)
+                t.task = additional_tasks[i]
+                tasks.append(t)
+            return tasks
+
 ELSE:
     class PayloadType(IntFlag):
         DEFAULT = 0 # only for interface. Ignored in Optix versions < 7.4
-
 
 
 cdef class ModuleCompileOptions(OptixObject):
@@ -175,23 +234,18 @@ cdef class Module(OptixContextObject):
                  compile_flags=_nvrtc_compile_flags_default,
                  program_name=None):
         super().__init__(context)
-        self._compile_flags = list(compile_flags)
         cdef const char * c_ptx
         cdef unsigned int pipeline_payload_values, i
+        self._compile_flags = list(compile_flags)
+
         if src is not None:
             if not _is_ptx(src):
-                ptx = self._compile_cuda_ptx(src, name=program_name)
+                ptx = self._compile_cuda_ptx(src, compile_flags, name=program_name)
             else:
                 ptx = src
             c_ptx = ptx
-
             IF _OPTIX_VERSION > 70300:
-                # check if the payload values match between the module and pipeline compile options
-                pipeline_payload_values = <unsigned int>pipeline_compile_options.compile_options.numPayloadValues
-                if module_compile_options.payload_types.size() > 0:
-                    for i in range(module_compile_options.compile_options.numPayloadTypes):
-                        if pipeline_payload_values != module_compile_options.compile_options.payloadTypes[i].numPayloadValues:
-                            raise ValueError(f"number of payload values in module compile options at index {i} does not match the num_payload_values in the pipeline_compile_options.")
+                self._check_payload_values(module_compile_options, pipeline_compile_options)
 
             optix_check_return(optixModuleCreateFromPTX(self.context.c_context,
                                      &module_compile_options.compile_options,
@@ -206,22 +260,126 @@ cdef class Module(OptixContextObject):
         if <uintptr_t> self.module != 0:
             optix_check_return(optixModuleDestroy(self.module))
 
+    IF _OPTIX_VERSION > 70300:
+        @property
+        def compile_state(self):
+            cdef OptixModuleCompileState state
+            with nogil:
+                optix_check_return(optixModuleGetCompilationState(self.module, &state))
+            return ModuleCompileState(state)
+
+        @staticmethod
+        def _check_payload_values(ModuleCompileOptions module_compile_options, PipelineCompileOptions pipeline_compile_options):
+            IF _OPTIX_VERSION > 70300:
+                # check if the payload values match between the module and pipeline compile options
+                pipeline_payload_values = <unsigned int> pipeline_compile_options.compile_options.numPayloadValues
+                if module_compile_options.payload_types.size() > 0:
+                    for i in range(module_compile_options.compile_options.numPayloadTypes):
+                        if pipeline_payload_values != module_compile_options.compile_options.payloadTypes[
+                            i].numPayloadValues:
+                            raise ValueError(
+                                f"number of payload values in module compile options at index {i} does not match the num_payload_values in the pipeline_compile_options.")
+            return
+
+        @classmethod
+        def create_as_task(cls,
+                             DeviceContext context,
+                             src,
+                             ModuleCompileOptions module_compile_options = ModuleCompileOptions(),
+                             PipelineCompileOptions pipeline_compile_options = PipelineCompileOptions(),
+                             compile_flags=_nvrtc_compile_flags_default,
+                             program_name=None):
+            """
+            Create a module associated with a parallel task.
+            The function will perform just enough work to instantiate the module.
+            Everything else will be done by the task on request.
+
+            Parameters
+            ----------
+            context: DeviceContext
+                The current OptiX context
+            src: str
+                Either a string containing the module's source code or PTX or the path to a file containing it.
+            module_compile_options: ModuleCompileOptions
+                Compile options of this module
+            pipeline_compile_options: PipelineCompileOptions
+                Compile options of the pipeline the module will be used in
+            compile_flags: list[str], optional
+                List of compiler flags to use. If omitted, the default flags are used.
+            program_name: str, optional
+                The name the program is given internally. Of omitted either the filename is used if given or a default name is used.
+
+            Returns
+            -------
+
+            module: Module
+                The created module
+            task: Task
+                The task associated with this module
+
+            """
+            cdef Module module = Module(context, None, compile_flags=compile_flags)
+            cdef const char * c_ptx
+            cdef unsigned int pipeline_payload_values, i
+            cls._check_payload_values(module_compile_options, pipeline_compile_options)
+
+            if not _is_ptx(src):
+                ptx = cls._compile_cuda_ptx(src, compile_flags, name=program_name)
+            else:
+                ptx = src
+            c_ptx = ptx
+
+            cdef Task task = Task(module)
+
+            optix_check_return(optixModuleCreateFromPTXWithTasks(context.c_context,
+                                                                 &module_compile_options.compile_options,
+                                                                 &pipeline_compile_options.compile_options,
+                                                                 c_ptx,
+                                                                 len(ptx) + 1,
+                                                                 NULL,
+                                                                 NULL,
+                                                                 &module.module,
+                                                                 &task.task))
+            return module, task
+
+
     @classmethod
-    def builtin_is_module(cls,
+    def create_builtin_is_module(cls,
                           DeviceContext context,
                           ModuleCompileOptions module_compile_options,
                           PipelineCompileOptions pipeline_compile_options,
                           BuiltinISOptions builtin_is_options):
+        """
+        Return a module containing the builtin intersection program for the given primitive
+
+        Parameters
+        ----------
+        context: DeviceContext
+            The current optix context
+        module_compile_options: ModuleCompileOptions
+            The compile options for the module
+        pipeline_compile_options: PipelineCompileOptions
+            The compile options of the pipeline
+        builtin_is_options: BuiltinISOptions
+            Special options for the intersection program like the endcap type for curves
+
+        Returns
+        -------
+        module: Module
+            The Module containing the intersection program
+        """
         cdef Module module = cls(context, None)
+
+        IF _OPTIX_VERSION > 70300:
+            cls._check_payload_values(module_compile_options, pipeline_compile_options)
         optix_check_return(optixBuiltinISModuleGet(context.c_context,
                                                    &module_compile_options.compile_options,
                                                    &pipeline_compile_options.compile_options,
                                                    &builtin_is_options.options, &module.module))
         return module
 
-
-
-    def _compile_cuda_ptx(self, src, name=None, **kwargs):
+    @staticmethod
+    def _compile_cuda_ptx(src, compile_flags, name=None, **kwargs):
         if os.path.exists(src):
             name = src
             with open(src, 'r') as f:
@@ -233,8 +391,7 @@ cdef class Module(OptixContextObject):
         # TODO is there a public API for that?
         from cupy.cuda.compiler import _NVRTCProgram as NVRTCProgram
         prog = NVRTCProgram(src, name, **kwargs)
-        flags = self._compile_flags
-
+        flags = list(compile_flags)
         # get cuda and optix_include_paths
         cuda_include_path = get_cuda_include_path()
         optix_include_path = get_optix_include_path()
