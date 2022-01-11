@@ -110,6 +110,9 @@ ELSE:
     cdef class ModuleCompileOptions(OptixObject):
         cdef OptixModuleCompileOptions compile_options
 
+cdef class BuiltinISOptions:
+    cdef OptixBuiltinISOptions options
+
 cdef class Module(OptixContextObject):
     cdef OptixModule module
     cdef list _compile_flags

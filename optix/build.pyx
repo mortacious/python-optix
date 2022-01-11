@@ -31,6 +31,19 @@ class GeometryFlags(IntEnum):
     REQUIRE_SINGLE_ANYHIT_CALL = OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL
 
 
+class BuildFlags(IntFlag):
+    """
+    Wraps the OptixBuildFlags enum
+    """
+    NONE = OPTIX_BUILD_FLAG_NONE,
+    ALLOW_UPDATE = OPTIX_BUILD_FLAG_ALLOW_UPDATE,
+    ALLOW_COMPACTION = OPTIX_BUILD_FLAG_ALLOW_COMPACTION,
+    PREFER_FAST_TRACE = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE,
+    PREFER_FAST_BUILD = OPTIX_BUILD_FLAG_PREFER_FAST_BUILD,
+    ALLOW_RANDOM_VERTEX_ACCESS = OPTIX_BUILD_FLAG_ALLOW_RANDOM_VERTEX_ACCESS,
+    ALLOW_RANDOM_INSTANCE_ACCESS = OPTIX_BUILD_FLAG_ALLOW_RANDOM_INSTANCE_ACCESS,
+
+
 IF _OPTIX_VERSION > 70300:  # switch to new instance flags
     class PrimitiveType(IntEnum):
         """
@@ -807,6 +820,11 @@ cdef class AccelerationStructure(OptixContextObject):
 
     def _repr_details(self):
         return f"{self._num_elements} elements in {self._buffer_sizes.outputSizeInBytes} bytes"
+
+    @property
+    def build_flags(self):
+        return BuildFlags(self.build_flags)
+
 
 
 
