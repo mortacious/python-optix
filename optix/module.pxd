@@ -3,6 +3,7 @@ from .common cimport OptixResult, OptixModule
 from .context cimport OptixDeviceContext, OptixContextObject
 from .build cimport OptixPrimitiveType
 from .pipeline cimport OptixPipelineCompileOptions, OptixCompileDebugLevel
+from libcpp.vector cimport vector
 
 cdef extern from "optix_includes.h" nogil:
 
@@ -26,8 +27,8 @@ cdef extern from "optix_includes.h" nogil:
         const char* annotation
 
 
-    IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 3:  # switch to new version
-        cdef enum OptixPayloadType:
+    IF _OPTIX_VERSION > 70300:  # switch to new version
+        cdef enum OptixPayloadSemantics:
             OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_NONE,
             OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ,
             OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_WRITE,
@@ -48,6 +49,10 @@ cdef extern from "optix_includes.h" nogil:
             OPTIX_PAYLOAD_SEMANTICS_IS_READ,
             OPTIX_PAYLOAD_SEMANTICS_IS_WRITE,
             OPTIX_PAYLOAD_SEMANTICS_IS_READ_WRITE,
+
+        cdef struct OptixPayloadType:
+            unsigned int numPayloadValues
+            const unsigned int* payloadSemantics
 
         cdef struct OptixModuleCompileOptions:
             int maxRegisterCount
@@ -70,7 +75,6 @@ cdef extern from "optix_includes.h" nogil:
             OptixCompileDebugLevel 	debugLevel
             const OptixModuleCompileBoundValueEntry* boundValues
             unsigned int numBoundValues
-
 
         cdef struct OptixBuiltinISOptions:
             OptixPrimitiveType builtinISModuleType
@@ -97,9 +101,14 @@ cdef extern from "optix_includes.h" nogil:
                                         OptixModule *builtinModule)
 
 
-cdef class ModuleCompileOptions(OptixObject):
-    cdef OptixModuleCompileOptions compile_options
-
+IF _OPTIX_VERSION > 70300:  # switch to new version
+    cdef class ModuleCompileOptions(OptixObject):
+        cdef OptixModuleCompileOptions compile_options
+        cdef vector[OptixPayloadType] payload_types
+        cdef vector[vector[unsigned int]] payload_values # WTF!
+ELSE:
+    cdef class ModuleCompileOptions(OptixObject):
+        cdef OptixModuleCompileOptions compile_options
 
 cdef class Module(OptixContextObject):
     cdef OptixModule module

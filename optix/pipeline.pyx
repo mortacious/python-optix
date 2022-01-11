@@ -36,7 +36,7 @@ class TraversableGraphFlags(IntFlag):
     ALLOW_SINGLE_LEVEL_INSTANCING = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING
 
 
-IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 3:  # switch to new instance flags
+IF _OPTIX_VERSION > 70300:  # switch to new instance flags
     class CompileDebugLevel(IntEnum):
         """
         Wraps the OptixCompileDebugLevel enum.

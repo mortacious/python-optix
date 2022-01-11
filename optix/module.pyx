@@ -1,12 +1,13 @@
 # distutils: language = c++
 
-from enum import IntEnum
+from enum import IntEnum, IntFlag
 import os
 from .path_utility import get_cuda_include_path, get_optix_include_path
 from .common cimport optix_check_return, optix_init
 from .context cimport DeviceContext
 from .pipeline cimport PipelineCompileOptions
 from .pipeline import CompileDebugLevel
+from .common import ensure_iterable
 
 optix_init()
 
@@ -20,6 +21,38 @@ class CompileOptimizationLevel(IntEnum):
     LEVEL_2 = OPTIX_COMPILE_OPTIMIZATION_LEVEL_2,
     LEVEL_3 = OPTIX_COMPILE_OPTIMIZATION_LEVEL_3,
 
+IF _OPTIX_VERSION > 70300:
+    class PayloadSemantics(IntFlag):
+        """
+        Wraps the PayloadSemantics enum.
+        """
+
+        DEFAULT = OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_CH_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_MS_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_AH_READ_WRITE | OPTIX_PAYLOAD_SEMANTICS_IS_READ_WRITE # allow everything as default
+        TRACE_CALLER_NONE = OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_NONE,
+        TRACE_CALLER_READ = OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ,
+        TRACE_CALLER_WRITE = OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_WRITE,
+        TRACE_CALLER_READ_WRITE = OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ_WRITE,
+        CH_NONE = OPTIX_PAYLOAD_SEMANTICS_CH_NONE,
+        CH_READ = OPTIX_PAYLOAD_SEMANTICS_CH_READ,
+        CH_WRITE = OPTIX_PAYLOAD_SEMANTICS_CH_WRITE,
+        CH_READ_WRITE = OPTIX_PAYLOAD_SEMANTICS_CH_READ_WRITE,
+        MS_NONE = OPTIX_PAYLOAD_SEMANTICS_MS_NONE,
+        MS_READ = OPTIX_PAYLOAD_SEMANTICS_MS_READ,
+        MS_WRITE = OPTIX_PAYLOAD_SEMANTICS_MS_WRITE,
+        MS_READ_WRITE = OPTIX_PAYLOAD_SEMANTICS_MS_READ_WRITE,
+        AH_NONE = OPTIX_PAYLOAD_SEMANTICS_AH_NONE,
+        AH_READ = OPTIX_PAYLOAD_SEMANTICS_AH_READ,
+        AH_WRITE = OPTIX_PAYLOAD_SEMANTICS_AH_WRITE,
+        AH_READ_WRITE = OPTIX_PAYLOAD_SEMANTICS_AH_READ_WRITE,
+        IS_NONE = OPTIX_PAYLOAD_SEMANTICS_IS_NONE,
+        IS_READ = OPTIX_PAYLOAD_SEMANTICS_IS_READ,
+        IS_WRITE = OPTIX_PAYLOAD_SEMANTICS_IS_WRITE,
+        IS_READ_WRITE = OPTIX_PAYLOAD_SEMANTICS_IS_READ_WRITE
+ELSE:
+    class PayloadType(IntFlag):
+        DEFAULT = 0 # only for interface. Ignored in Optix versions < 7.4
+
+
 
 cdef class ModuleCompileOptions(OptixObject):
     """
@@ -29,16 +62,33 @@ cdef class ModuleCompileOptions(OptixObject):
     def __init__(self,
                  max_register_count=OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT,
                  opt_level=CompileOptimizationLevel.DEFAULT,
-                 debug_level= CompileDebugLevel.DEFAULT): #TODO add bound values
+                 debug_level= CompileDebugLevel.DEFAULT,
+                 payload_types=None): #TODO add bound values
         self.compile_options.maxRegisterCount = max_register_count
         self.compile_options.optLevel = opt_level.value
         self.compile_options.debugLevel = debug_level.value
         self.compile_options.numBoundValues = 0
         self.compile_options.boundValues = NULL # currently not supported
 
-        IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 3:  # TODO expose these!
-            self.compile_options.numPayloadTypes = 0
-            self.compile_options.payloadTypes = NULL
+        IF _OPTIX_VERSION > 70300:
+            if payload_types is None:
+                self.compile_options.numPayloadTypes = 0
+                self.compile_options.payloadTypes = NULL
+            else:
+                # set the payload types for these compile options (this is horrible, i know ;))
+                payload_types = [ensure_iterable(pt) for pt in ensure_iterable(payload_types)] # list of lists
+                self.payload_types.resize(len(payload_types)) # the number of different payload types
+                self.payload_values.resize(self.payload_types.size()) # a vector of semantics for each payload type
+                self.compile_options.numPayloadTypes = self.payload_types.size()
+                for i, payload_values in enumerate(payload_types):
+                    self.payload_types[i].numPayloadValues = len(payload_values)
+                    self.payload_values[i].resize(self.payload_types[i].numPayloadValues)
+                    for j, payload_semantics in enumerate(payload_values):
+                        self.payload_values[i][j] = payload_semantics.value
+                    self.payload_types[i].payloadSemantics = self.payload_values[i].data()
+                self.compile_options.payloadTypes = self.payload_types.data()
+
+
 
     @property
     def max_register_count(self):
@@ -111,6 +161,16 @@ cdef class Module(OptixContextObject):
         else:
             ptx = src
         cdef const char* c_ptx = ptx
+
+        IF _OPTIX_VERSION > 70300:
+            # check if the payload values match between the module and pipeline compile options
+            cdef unsigned int pipeline_payload_values = <unsigned int>pipeline_compile_options.compile_options.numPayloadValues
+            cdef unsigned int i
+            if module_compile_options.payload_types.size() > 0:
+                for i in range(module_compile_options.compile_options.numPayloadTypes):
+                    if pipeline_payload_values != module_compile_options.compile_options.payloadTypes[i].numPayloadValues:
+                        raise ValueError(f"number of payload values in module compile options at index {i} does not match the num_payload_values in the pipeline_compile_options.")
+
         optixModuleCreateFromPTX(self.context.c_context,
                                  &module_compile_options.compile_options,
                                  &pipeline_compile_options.compile_options,

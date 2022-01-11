@@ -79,6 +79,10 @@ cdef extern from "optix.h" nogil:
             OPTIX_PRIMITIVE_TYPE_ROUND_CATMULLROM,
             OPTIX_PRIMITIVE_TYPE_TRIANGLE,
 
+        cdef enum OptixCurveEndcapFlags:
+            OPTIX_CURVE_ENDCAP_DEFAULT,
+            OPTIX_CURVE_ENDCAP_ON
+
         cdef struct OptixBuildInputCurveArray:
             OptixPrimitiveType curveType
             unsigned int numPrimitives

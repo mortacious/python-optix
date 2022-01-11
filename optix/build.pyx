@@ -31,7 +31,7 @@ class GeometryFlags(IntEnum):
     REQUIRE_SINGLE_ANYHIT_CALL = OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL
 
 
-IF _OPTIX_VERSION_MAJOR == 4 and _OPTIX_VERSION_MINOR > 3:  # switch to new instance flags
+IF _OPTIX_VERSION > 70300:  # switch to new instance flags
     class PrimitiveType(IntEnum):
         """
         Wraps the OptixPrimitiveType enum.
@@ -42,7 +42,14 @@ IF _OPTIX_VERSION_MAJOR == 4 and _OPTIX_VERSION_MINOR > 3:  # switch to new inst
         ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR,
         ROUND_CATMULLROM = OPTIX_PRIMITIVE_TYPE_ROUND_CATMULLROM,
         TRIANGLE = OPTIX_PRIMITIVE_TYPE_TRIANGLE
+
+    class CurveEndcapFlags(IntEnum):
+        DEFAULT = OPTIX_CURVE_ENDCAP_DEFAULT,
+        ON = OPTIX_CURVE_ENDCAP_ON
 ELSE:
+    class CurveEndcapFlags(IntEnum):
+        DEFAULT = 0 # only for interface. Ignored for Optix versions below 7.4
+
     class PrimitiveType(IntEnum):
         """
         Wraps the OptixPrimitiveType enum.
@@ -335,7 +342,8 @@ cdef class BuildInputCurveArray(BuildInputArray):
                  index_buffer,
                  normal_buffers = None,
                  flags=None,
-                 primitive_index_offset=0):
+                 primitive_index_offset=0,
+                 endcap_flags=CurveEndcapFlags.DEFAULT):
 
         self.build_input.curveType = curve_type.value
         self._d_vertex_buffers = [cp.asarray(vb, np.float32) for vb in ensure_iterable(vertex_buffers)]
@@ -395,8 +403,8 @@ cdef class BuildInputCurveArray(BuildInputArray):
 
         self.build_input.primitiveIndexOffset = primitive_index_offset
 
-        IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 3:  # TODO expose these!
-            self.build_input.endcapFlags = 0
+        IF _OPTIX_VERSION > 70300:
+            self.build_input.endcapFlags = endcap_flags # only for Optix versions >= 7.4
 
     cdef void prepare_build_input(self, OptixBuildInput * build_input) except *:
         build_input.type = OPTIX_BUILD_INPUT_TYPE_CURVES
