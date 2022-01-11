@@ -9,6 +9,7 @@ from .pipeline cimport PipelineCompileOptions
 from .pipeline import CompileDebugLevel
 from .build import PrimitiveType, BuildFlags, CurveEndcapFlags
 from .common import ensure_iterable
+from libc.stdint cimport uintptr_t
 
 optix_init()
 
@@ -202,7 +203,8 @@ cdef class Module(OptixContextObject):
                                      &self.module))
 
     def __dealloc__(self):
-        optix_check_return(optixModuleDestroy(self.module))
+        if <uintptr_t> self.module != 0:
+            optix_check_return(optixModuleDestroy(self.module))
 
     @classmethod
     def builtin_is_module(cls,
