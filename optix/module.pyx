@@ -176,18 +176,18 @@ cdef class Module(OptixContextObject):
                  program_name=None):
         super().__init__(context)
         self._compile_flags = list(compile_flags)
-
+        cdef const char * c_ptx
+        cdef unsigned int pipeline_payload_values, i
         if src is not None:
             if not _is_ptx(src):
                 ptx = self._compile_cuda_ptx(src, name=program_name)
             else:
                 ptx = src
-            cdef const char* c_ptx = ptx
+            c_ptx = ptx
 
             IF _OPTIX_VERSION > 70300:
                 # check if the payload values match between the module and pipeline compile options
-                cdef unsigned int pipeline_payload_values = <unsigned int>pipeline_compile_options.compile_options.numPayloadValues
-                cdef unsigned int i
+                pipeline_payload_values = <unsigned int>pipeline_compile_options.compile_options.numPayloadValues
                 if module_compile_options.payload_types.size() > 0:
                     for i in range(module_compile_options.compile_options.numPayloadTypes):
                         if pipeline_payload_values != module_compile_options.compile_options.payloadTypes[i].numPayloadValues:
@@ -212,7 +212,7 @@ cdef class Module(OptixContextObject):
                           ModuleCompileOptions module_compile_options,
                           PipelineCompileOptions pipeline_compile_options,
                           BuiltinISOptions builtin_is_options):
-        module = cls(context, None)
+        cdef Module module = cls(context, None)
         optix_check_return(optixBuiltinISModuleGet(context.c_context,
                                                    &module_compile_options.compile_options,
                                                    &pipeline_compile_options.compile_options,

@@ -110,7 +110,7 @@ ELSE:
     cdef class ModuleCompileOptions(OptixObject):
         cdef OptixModuleCompileOptions compile_options
 
-cdef class BuiltinISOptions:
+cdef class BuiltinISOptions(OptixObject):
     cdef OptixBuiltinISOptions options
 
 cdef class Module(OptixContextObject):
