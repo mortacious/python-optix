@@ -10,6 +10,8 @@ cdef extern from "optix_includes.h" nogil:
     cdef OptixResult optixInit()
 
     cdef size_t OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT
+    cdef size_t OPTIX_COMPILE_DEFAULT_MAX_PAYLOAD_VALUE_COUNT
+
 
     cdef enum OptixCompileOptimizationLevel:
         OPTIX_COMPILE_OPTIMIZATION_DEFAULT,
@@ -27,6 +29,8 @@ cdef extern from "optix_includes.h" nogil:
 
 
     IF _OPTIX_VERSION > 70300:  # switch to new version
+        cdef size_t OPTIX_COMPILE_DEFAULT_MAX_PAYLOAD_TYPE_COUNT
+
         cdef enum OptixPayloadSemantics:
             OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_NONE,
             OPTIX_PAYLOAD_SEMANTICS_TRACE_CALLER_READ,

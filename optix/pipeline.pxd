@@ -5,6 +5,7 @@ from .program_group cimport ProgramGroup, OptixStackSizes
 from .shader_binding_table cimport OptixShaderBindingTable
 
 cdef extern from "optix_includes.h" nogil:
+    cdef size_t OPTIX_COMPILE_DEFAULT_MAX_PAYLOAD_VALUE_COUNT
 
     # pipeline functions and structs
     ctypedef struct OptixPipeline:
@@ -23,7 +24,7 @@ cdef extern from "optix_includes.h" nogil:
         OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING
 
 
-    IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 3:  # switch to new instance flags
+    IF _OPTIX_VERSION > 70300:  # switch to new instance flags
         cdef enum OptixCompileDebugLevel:
             OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
             OPTIX_COMPILE_DEBUG_LEVEL_NONE,

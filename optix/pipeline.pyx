@@ -84,6 +84,8 @@ cdef class PipelineCompileOptions(OptixObject):
     """
     Class wrapping the OptixPipelineCompileOptions struct.
     """
+    DEFAULT_MAX_PAYLOAD_VALUE_COUNT = OPTIX_COMPILE_DEFAULT_MAX_PAYLOAD_VALUE_COUNT
+
     def __init__(self,
                  uses_motion_blur=False,
                  traversable_graph_flags = TraversableGraphFlags.ALLOW_ANY,
@@ -92,13 +94,13 @@ cdef class PipelineCompileOptions(OptixObject):
                  exception_flags = ExceptionFlags.NONE,
                  pipeline_launch_params_variable_name = "params",
                  uses_primitive_type_flags = PrimitiveTypeFlags.DEFAULT):
-        self.compile_options.usesMotionBlur = uses_motion_blur
-        self.compile_options.traversableGraphFlags = traversable_graph_flags.value
-        self.compile_options.numPayloadValues = num_payload_values
-        self.compile_options.numAttributeValues = num_attribute_values
-        self.compile_options.exceptionFlags = exception_flags.value
+        self.uses_motion_blur = uses_motion_blur
+        self.traversable_graph_flags = traversable_graph_flags
+        self.num_payload_values = num_payload_values
+        self.num_attribute_values = num_attribute_values
+        self.exception_flags = exception_flags
         self.pipeline_launch_params_variable_name = pipeline_launch_params_variable_name
-        self.compile_options.usesPrimitiveTypeFlags = uses_primitive_type_flags.value
+        self.uses_primitive_type_flags = uses_primitive_type_flags
 
     @property
     def uses_motion_blur(self):
@@ -122,6 +124,8 @@ cdef class PipelineCompileOptions(OptixObject):
 
     @num_payload_values.setter
     def num_payload_values(self, num_payload_values):
+        if num_payload_values > self.DEFAULT_MAX_PAYLOAD_VALUE_COUNT:
+            raise ValueError(f"A maximum of {self.DEFAULT_MAX_PAYLOAD_VALUE_COUNT} payload values is allowed.")
         self.compile_options.numPayloadValues = num_payload_values
 
     @property

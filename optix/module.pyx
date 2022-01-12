@@ -112,18 +112,17 @@ IF _OPTIX_VERSION > 70300:
                 tasks.append(t)
             return tasks
 
-ELSE:
-    class PayloadType(IntFlag):
-        DEFAULT = 0 # only for interface. Ignored in Optix versions < 7.4
-
 
 cdef class ModuleCompileOptions(OptixObject):
     """
     Wraps the OptixModuleCompileOptions struct.
     """
     DEFAULT_MAX_REGISTER_COUNT = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT
+    DEFAULT_MAX_PAYLOAD_TYPE_COUNT = OPTIX_COMPILE_DEFAULT_MAX_PAYLOAD_TYPE_COUNT
+    DEFAULT_MAX_PAYLOAD_VALUE_COUNT = OPTIX_COMPILE_DEFAULT_MAX_PAYLOAD_VALUE_COUNT
+
     def __init__(self,
-                 max_register_count=OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT,
+                 max_register_count=DEFAULT_MAX_REGISTER_COUNT,
                  opt_level=CompileOptimizationLevel.DEFAULT,
                  debug_level= CompileDebugLevel.DEFAULT,
                  payload_types=None): #TODO add bound values
@@ -185,7 +184,6 @@ cdef _is_ptx(src):
     if not isinstance(src, (bytes, bytearray)):
         return False
     for line in src.splitlines():
-        print(line)
         if len(line) == 0 or line.startswith(b'//') or line.startswith(b'\n'):
             continue
         return line.startswith(b'.version')
@@ -241,13 +239,10 @@ cdef class Module(OptixContextObject):
         self._compile_flags = list(compile_flags)
 
         if src is not None:
-            if not _is_ptx(src):
-                ptx = self._compile_cuda_ptx(src, compile_flags, name=program_name)
-            else:
-                ptx = src
+            ptx = self.compile_cuda_ptx(src, compile_flags, name=program_name)
             c_ptx = ptx
-            IF _OPTIX_VERSION > 70300:
-                self._check_payload_values(module_compile_options, pipeline_compile_options)
+            #IF _OPTIX_VERSION > 70300:
+            #    self._check_payload_values(module_compile_options, pipeline_compile_options)
 
             optix_check_return(optixModuleCreateFromPTX(self.context.c_context,
                                      &module_compile_options.compile_options,
@@ -270,18 +265,18 @@ cdef class Module(OptixContextObject):
                 optix_check_return(optixModuleGetCompilationState(self.module, &state))
             return ModuleCompileState(state)
 
-        @staticmethod
-        def _check_payload_values(ModuleCompileOptions module_compile_options, PipelineCompileOptions pipeline_compile_options):
-            IF _OPTIX_VERSION > 70300:
-                # check if the payload values match between the module and pipeline compile options
-                pipeline_payload_values = <unsigned int> pipeline_compile_options.compile_options.numPayloadValues
-                if module_compile_options.payload_types.size() > 0:
-                    for i in range(module_compile_options.compile_options.numPayloadTypes):
-                        if pipeline_payload_values != module_compile_options.compile_options.payloadTypes[
-                            i].numPayloadValues:
-                            raise ValueError(
-                                f"number of payload values in module compile options at index {i} does not match the num_payload_values in the pipeline_compile_options.")
-            return
+        # @staticmethod
+        # def _check_payload_values(ModuleCompileOptions module_compile_options, PipelineCompileOptions pipeline_compile_options):
+        #     IF _OPTIX_VERSION > 70300:
+        #         # check if the payload values match between the module and pipeline compile options
+        #         pipeline_payload_values = <unsigned int> pipeline_compile_options.compile_options.numPayloadValues
+        #         if module_compile_options.payload_types.size() > 0:
+        #             for i in range(module_compile_options.compile_options.numPayloadTypes):
+        #                 if pipeline_payload_values != module_compile_options.compile_options.payloadTypes[
+        #                     i].numPayloadValues:
+        #                     raise ValueError(
+        #                         f"number of payload values in module compile options at index {i} does not match the num_payload_values in the pipeline_compile_options.")
+        #     return
 
         @classmethod
         def create_as_task(cls,
@@ -323,12 +318,9 @@ cdef class Module(OptixContextObject):
             cdef Module module = Module(context, None, compile_flags=compile_flags)
             cdef const char * c_ptx
             cdef unsigned int pipeline_payload_values, i
-            cls._check_payload_values(module_compile_options, pipeline_compile_options)
+            #cls._check_payload_values(module_compile_options, pipeline_compile_options)
 
-            if not _is_ptx(src):
-                ptx = cls._compile_cuda_ptx(src, compile_flags, name=program_name)
-            else:
-                ptx = src
+            ptx = cls.compile_cuda_ptx(src, compile_flags, name=program_name)
             c_ptx = ptx
 
             cdef Task task = Task(module)
@@ -381,11 +373,13 @@ cdef class Module(OptixContextObject):
         return module
 
     @staticmethod
-    def _compile_cuda_ptx(src, compile_flags, name=None, **kwargs):
+    def compile_cuda_ptx(src, compile_flags=_nvrtc_compile_flags_default, name=None, **kwargs):
         if os.path.exists(src):
             name = src
             with open(src, 'r') as f:
                 src = f.read()
+        if _is_ptx(src):
+            return src
 
         elif name is None:
             name = "default_program"
