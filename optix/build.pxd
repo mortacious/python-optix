@@ -303,12 +303,12 @@ cdef class BuildInputCurveArray(BuildInputArray):
 
 cdef class Instance(OptixObject):
     cdef OptixInstance instance
-    cdef AccelerationStructure traversable
+    cdef AccelerationStructure _traversable
 
 
 cdef class BuildInputInstanceArray(BuildInputArray):
     cdef OptixBuildInputInstanceArray build_input
-    cdef public object instances
+    cdef object instances
     cdef object _d_instances
 
 

@@ -11,9 +11,6 @@ OPTIX_VERSION = _OPTIX_VERSION
 def optix_version():
     return _OPTIX_VERSION_MAJOR, _OPTIX_VERSION_MINOR, _OPTIX_VERSION_MICRO
 
-
-
-
 cdef class _LogWrapper:
     def __init__(self, log_function):
         self.log_function = log_function
@@ -262,3 +259,4 @@ cdef class OptixContextObject(OptixObject):
     """
     def __init__(self, DeviceContext context):
         self.context = context
+

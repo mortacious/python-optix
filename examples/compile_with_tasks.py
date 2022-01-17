@@ -1,7 +1,4 @@
 import concurrent.futures
-
-import direct.task.Task
-
 import optix as ox
 import argparse
 import logging
