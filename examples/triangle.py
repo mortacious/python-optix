@@ -118,5 +118,3 @@ if __name__ == "__main__":
     img = img.reshape(img_size[1], img_size[0], 4)
     img = ImageOps.flip(Image.fromarray(img, 'RGBA'))
     img.show()
-
-

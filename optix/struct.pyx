@@ -22,7 +22,6 @@ def  _aligned_itemsize( formats, alignment ):
         } )
     return round_up( temp_dtype.itemsize, alignment )
 
-
 def array_to_device_memory(numpy_array, stream=None):
     """
     Transfer a numpy array to cuda device memory. This does not generate a full cupy.ndarray, but an
@@ -262,15 +261,22 @@ cdef class SbtRecord(_StructHelper):
     All options are the same as in the base class.
 .   The alignment parameter is ignored though and only present for the interface.
     """
-    def __init__(self, ProgramGroup program_group, names=(), formats=(), values=None, size=1, alignment=1):
+    def __init__(self, program_groups, names=(), formats=(), values=None):
+        program_groups = list(ensure_iterable(program_groups))
         names = ensure_iterable(names)
         formats = ensure_iterable(formats)
+        
+        if not all(isinstance(p, ProgramGroup) for p in program_groups):
+            raise TypeError("Only program groups")
+        
+        cdef unsigned int num_program_groups = len(program_groups)
+        
+        self.program_groups = program_groups
 
-        self.program_group = program_group
         header_format = '{}B'.format(OPTIX_SBT_RECORD_HEADER_SIZE)
         names = ('header',) + names
         formats = (header_format,) + formats
-        super().__init__(names, formats, values=values, size=size, alignment=OPTIX_SBT_RECORD_ALIGNMENT)
+        super().__init__(names, formats, values=values, size=num_program_groups, alignment=OPTIX_SBT_RECORD_ALIGNMENT)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -280,8 +286,17 @@ cdef class SbtRecord(_StructHelper):
         cdef size_t size = array.shape[0]
         cdef unsigned char[:, ::1] buffer =  array.view('B').reshape(-1, itemsize)
         for i in range(size):
-            optixSbtRecordPackHeader(self.program_group.program_group, <void *>(&buffer[i, 0]))
+            optixSbtRecordPackHeader((<ProgramGroup>self.program_groups[i]).program_group, <void *>(&buffer[i, 0]))
         return array
+
+    def update_program_group(self, i, program_group):
+        if not isinstance(program_group, ProgramGroup):
+            raise TypeError("Expected a program group as second argument.")
+        self.program_groups[i] = program_group
+        
+        cdef size_t itemsize = self._array.dtype.itemsize
+        cdef unsigned char[:, ::1] buffer = self._array.view('B').reshape(-1, itemsize)
+        optixSbtRecordPackHeader((<ProgramGroup>self.program_groups[<size_t>i]).program_group, <void *>(&buffer[<size_t>i, 0]))
 
 
 cdef class LaunchParamsRecord(_StructHelper):

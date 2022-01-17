@@ -179,6 +179,12 @@ cdef class ModuleCompileOptions(OptixObject):
 
 cdef tuple _nvrtc_compile_flags_default = ('-use_fast_math', '-lineinfo', '-default-device', '-std=c++11', '-rdc', 'true')
 
+def get_default_nvrtc_compile_flags(std=None, rdc=False):
+    flags = list(_nvrtc_compile_flags_default[:-3])
+    flags.append('-std=c++11' if std is None else f'-std=c++{std}')
+    if rdc:
+        flags.extend(['-rdc', 'true'])
+    return tuple(flags)
 
 cdef _is_ptx(src):
     if not isinstance(src, (bytes, bytearray)):

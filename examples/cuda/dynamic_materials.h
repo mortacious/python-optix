@@ -26,32 +26,26 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
-#pragma once
-
 struct Params
 {
+    OptixTraversableHandle trav_handle;
     uchar4*                image;
     unsigned int           image_width;
     unsigned int           image_height;
+    float                  radius;
     float3                 cam_eye;
-    float3                 cam_u, cam_v, cam_w;
-    OptixTraversableHandle handle;
-};
-
-
-struct RayGenData
-{
-    // No data needed
+    float3                 camera_u, camera_v, camera_w;
 };
 
 
 struct MissData
 {
-    float3 bg_color;
+    float3 color;
 };
 
 
 struct HitGroupData
 {
-    // No data needed
+    float3       color;
+    unsigned int geometryIndex;
 };

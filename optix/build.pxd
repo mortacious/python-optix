@@ -210,7 +210,6 @@ cdef extern from "optix.h" nogil:
         unsigned int flags
         OptixTraversableHandle traversableHandle
 
-
     OptixResult optixAccelComputeMemoryUsage(OptixDeviceContext context,
                                  const OptixAccelBuildOptions * accelOptions,
                                  const OptixBuildInput * buildInputs,
@@ -309,7 +308,7 @@ cdef class Instance(OptixObject):
 
 cdef class BuildInputInstanceArray(BuildInputArray):
     cdef OptixBuildInputInstanceArray build_input
-    cdef object instances
+    cdef public object instances
     cdef object _d_instances
 
 

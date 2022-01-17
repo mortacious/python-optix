@@ -25,33 +25,32 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
-
-#pragma once
+//
 
 struct Params
 {
-    uchar4*                image;
-    unsigned int           image_width;
-    unsigned int           image_height;
-    float3                 cam_eye;
-    float3                 cam_u, cam_v, cam_w;
-    OptixTraversableHandle handle;
+    uchar4*                frame_buffer;
+    unsigned int           width;
+    unsigned int           height;
+    float3                 eye, U, V, W;
+    OptixTraversableHandle trav_handle;
+    int                    subframe_index;
 };
-
 
 struct RayGenData
 {
-    // No data needed
+    float3 cam_eye;
+    float3 camera_u, camera_v, camera_w;
 };
 
 
 struct MissData
 {
-    float3 bg_color;
+    float4 bg_color;
 };
 
 
 struct HitGroupData
 {
-    // No data needed
+    float3 color;
 };
