@@ -51,7 +51,7 @@ cython_compile_env = {
 extensions = [Extension("*", ["optix/*.pyx"],
                         include_dirs=[cuda_include_path, optix_include_path])]
 extensions = cythonize(extensions, language_level="3",
-                        compile_time_env=cython_compile_env)
+                        compile_time_env=cython_compile_env, build_dir="build")
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
