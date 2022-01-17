@@ -7,6 +7,7 @@ import OpenGL.GL as gl
 
 from optix.sutil.vecmath import vtype_to_dtype
 
+
 class BufferImageFormat(enum.Enum):
     UCHAR4=0
     FLOAT3=1
@@ -27,11 +28,12 @@ class BufferImageFormat(enum.Enum):
     def itemsize(self):
         return self.dtype.itemsize
 
+
 class CudaOutputBufferType(enum.Enum):
-    CUDA_DEVICE = 0, # not preferred, typically slower than ZERO_COPY
-    GL_INTEROP  = 1, # single device only, preferred for single device
-    ZERO_COPY   = 2, # general case, preferred for multi-gpu if not fully nvlink connected
-    CUDA_P2P    = 3, # fully connected only, preferred for fully nvlink connected
+    CUDA_DEVICE = 0,  # not preferred, typically slower than ZERO_COPY
+    GL_INTEROP  = 1,  # single device only, preferred for single device
+    ZERO_COPY   = 2,  # general case, preferred for multi-gpu if not fully nvlink connected
+    CUDA_P2P    = 3,  # fully connected only, preferred for fully nvlink connected
 
 
 class CudaOutputBuffer:
@@ -51,17 +53,16 @@ class CudaOutputBuffer:
 
         self._reallocate_buffers()
 
-
     def resize(self, width, height):
         self.width = width
         self.height = height
 
     def get_host_buffer(self):
-        if buffer_type is CudaOutputBufferType.CUDA_DEVICE:
+        if self.buffer_type is CudaOutputBufferType.CUDA_DEVICE:
             self.copy_device_to_host()
             return self._host_buffer
         else:
-            msg = f'Buffer type {buffer_type} has not been implemented yet.'
+            msg = f'Buffer type {self.buffer_type} has not been implemented yet.'
             raise NotImplementedError(msg)
 
     def map(self):
