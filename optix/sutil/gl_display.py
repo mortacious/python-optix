@@ -49,7 +49,7 @@ void main()
             '_quad_vertex_buffer', '_image_format']
 
     def __init__(self, image_format):
-        assert isinstance(image_format, BufferImageFormat), type(fmt)
+        assert isinstance(image_format, BufferImageFormat)
 
         vertex_array = gl.glGenVertexArrays(1)
         gl.glBindVertexArray(vertex_array)
