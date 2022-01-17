@@ -1,7 +1,12 @@
-import optix as ox
+import os
+
 import cupy as cp
 import numpy as np
+import optix as ox
+
 from PIL import Image, ImageOps
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
 
 img_size = (1024, 768)
 
@@ -19,7 +24,8 @@ def create_acceleration_structure(ctx, vertices):
 
 def create_module(ctx, pipeline_opts):
     compile_opts = ox.ModuleCompileOptions(debug_level=ox.CompileDebugLevel.LINEINFO)
-    module = ox.Module(ctx, 'cuda/triangle.cu', compile_opts, pipeline_opts)
+    source = os.path.join(script_dir, 'cuda', 'triangle.cu')
+    module = ox.Module(ctx, source, compile_opts, pipeline_opts)
     return module
 
 
@@ -118,5 +124,3 @@ if __name__ == "__main__":
     img = img.reshape(img_size[1], img_size[0], 4)
     img = ImageOps.flip(Image.fromarray(img, 'RGBA'))
     img.show()
-
-
