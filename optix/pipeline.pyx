@@ -16,16 +16,6 @@ from .shader_binding_table cimport ShaderBindingTable
 optix_init()
 
 
-class CompileDebugLevel(IntEnum):
-    """
-    Wraps the OptixCompileDebugLevel enum.
-    """
-    DEFAULT = OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
-    NONE = OPTIX_COMPILE_DEBUG_LEVEL_NONE,
-    LINEINFO = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO,
-    FULL = OPTIX_COMPILE_DEBUG_LEVEL_FULL
-
-
 class ExceptionFlags(IntFlag):
     """
     Wraps the OptixExceptionFlags enum.
@@ -46,22 +36,56 @@ class TraversableGraphFlags(IntFlag):
     ALLOW_SINGLE_LEVEL_INSTANCING = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING
 
 
-class PrimitiveTypeFlags(IntFlag):
-    """
-    Wraps the OptixPrimitiveTypeFlags enum.
-    """
-    DEFAULT = 0, # corresponds to CUSTOM | TRIANGLE
-    CUSTOM = OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM,
-    ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE,
-    ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
-    ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR,
-    TRIANGLE = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE
+IF _OPTIX_VERSION > 70300:  # switch to new instance flags
+    class CompileDebugLevel(IntEnum):
+        """
+        Wraps the OptixCompileDebugLevel enum.
+        """
+        DEFAULT = OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
+        NONE = OPTIX_COMPILE_DEBUG_LEVEL_NONE,
+        MINIMAL = OPTIX_COMPILE_DEBUG_LEVEL_MINIMAL,
+        MODERATE = OPTIX_COMPILE_DEBUG_LEVEL_MODERATE,
+        FULL = OPTIX_COMPILE_DEBUG_LEVEL_FULL
+
+    class PrimitiveTypeFlags(IntFlag):
+        """
+        Wraps the OptixPrimitiveTypeFlags enum.
+        """
+        DEFAULT = 0, # corresponds to CUSTOM | TRIANGLE
+        CUSTOM = OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM,
+        ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE,
+        ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
+        ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR,
+        ROUND_CATMULLROM = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CATMULLROM,
+        TRIANGLE = <unsigned int>OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE # fixes negative number error
+ELSE:
+    class CompileDebugLevel(IntEnum):
+        """
+        Wraps the OptixCompileDebugLevel enum.
+        """
+        DEFAULT = OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
+        NONE = OPTIX_COMPILE_DEBUG_LEVEL_NONE,
+        LINEINFO = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO,
+        FULL = OPTIX_COMPILE_DEBUG_LEVEL_FULL
+
+    class PrimitiveTypeFlags(IntFlag):
+        """
+        Wraps the OptixPrimitiveTypeFlags enum.
+        """
+        DEFAULT = 0, # corresponds to CUSTOM | TRIANGLE
+        CUSTOM = OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM,
+        ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE,
+        ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
+        ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR,
+        TRIANGLE = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE
 
 
 cdef class PipelineCompileOptions(OptixObject):
     """
     Class wrapping the OptixPipelineCompileOptions struct.
     """
+    DEFAULT_MAX_PAYLOAD_VALUE_COUNT = OPTIX_COMPILE_DEFAULT_MAX_PAYLOAD_VALUE_COUNT
+
     def __init__(self,
                  uses_motion_blur=False,
                  traversable_graph_flags = TraversableGraphFlags.ALLOW_ANY,
@@ -70,13 +94,13 @@ cdef class PipelineCompileOptions(OptixObject):
                  exception_flags = ExceptionFlags.NONE,
                  pipeline_launch_params_variable_name = "params",
                  uses_primitive_type_flags = PrimitiveTypeFlags.DEFAULT):
-        self.compile_options.usesMotionBlur = uses_motion_blur
-        self.compile_options.traversableGraphFlags = traversable_graph_flags.value
-        self.compile_options.numPayloadValues = num_payload_values
-        self.compile_options.numAttributeValues = num_attribute_values
-        self.compile_options.exceptionFlags = exception_flags.value
+        self.uses_motion_blur = uses_motion_blur
+        self.traversable_graph_flags = traversable_graph_flags
+        self.num_payload_values = num_payload_values
+        self.num_attribute_values = num_attribute_values
+        self.exception_flags = exception_flags
         self.pipeline_launch_params_variable_name = pipeline_launch_params_variable_name
-        self.compile_options.usesPrimitiveTypeFlags = <int>(uses_primitive_type_flags.value)
+        self.uses_primitive_type_flags = uses_primitive_type_flags
 
     @property
     def uses_motion_blur(self):
@@ -100,6 +124,8 @@ cdef class PipelineCompileOptions(OptixObject):
 
     @num_payload_values.setter
     def num_payload_values(self, num_payload_values):
+        if num_payload_values > self.DEFAULT_MAX_PAYLOAD_VALUE_COUNT:
+            raise ValueError(f"A maximum of {self.DEFAULT_MAX_PAYLOAD_VALUE_COUNT} payload values is allowed.")
         self.compile_options.numPayloadValues = num_payload_values
 
     @property

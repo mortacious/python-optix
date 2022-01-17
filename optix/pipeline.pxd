@@ -5,6 +5,7 @@ from .program_group cimport ProgramGroup, OptixStackSizes
 from .shader_binding_table cimport OptixShaderBindingTable
 
 cdef extern from "optix_includes.h" nogil:
+    cdef size_t OPTIX_COMPILE_DEFAULT_MAX_PAYLOAD_VALUE_COUNT
 
     # pipeline functions and structs
     ctypedef struct OptixPipeline:
@@ -17,26 +18,40 @@ cdef extern from "optix_includes.h" nogil:
         OPTIX_EXCEPTION_FLAG_USER,
         OPTIX_EXCEPTION_FLAG_DEBUG
 
-
-    cdef enum OptixCompileDebugLevel:
-        OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
-        OPTIX_COMPILE_DEBUG_LEVEL_NONE,
-        OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO,
-        OPTIX_COMPILE_DEBUG_LEVEL_FULL
-
-
     cdef enum OptixTraversableGraphFlags:
         OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY,
         OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS,
         OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING
 
 
-    cdef enum OptixPrimitiveTypeFlags:
-        OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM,
-        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE,
-        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
-        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR,
-        OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE,
+    IF _OPTIX_VERSION > 70300:  # switch to new instance flags
+        cdef enum OptixCompileDebugLevel:
+            OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
+            OPTIX_COMPILE_DEBUG_LEVEL_NONE,
+            OPTIX_COMPILE_DEBUG_LEVEL_MINIMAL,
+            OPTIX_COMPILE_DEBUG_LEVEL_MODERATE,
+            OPTIX_COMPILE_DEBUG_LEVEL_FULL
+
+        cdef enum OptixPrimitiveTypeFlags:
+            OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM,
+            OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE,
+            OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
+            OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR,
+            OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CATMULLROM,
+            OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE,
+    ELSE:
+        cdef enum OptixCompileDebugLevel:
+            OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
+            OPTIX_COMPILE_DEBUG_LEVEL_NONE,
+            OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO,
+            OPTIX_COMPILE_DEBUG_LEVEL_FULL
+
+        cdef enum OptixPrimitiveTypeFlags:
+            OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM,
+            OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE,
+            OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
+            OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR,
+            OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE,
 
 
     cdef struct OptixPipelineCompileOptions:

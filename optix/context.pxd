@@ -59,4 +59,4 @@ cdef class DeviceContext(OptixObject):
 
 
 cdef class OptixContextObject(OptixObject):
-    cdef DeviceContext context
+    cdef public DeviceContext context

@@ -1,6 +1,6 @@
-from .context import DeviceContext
+from .context import DeviceContext, optix_version
 from .build import *
-from .module import Module, ModuleCompileOptions, CompileOptimizationLevel, CompileDebugLevel
+from .module import Module, ModuleCompileOptions, CompileOptimizationLevel, CompileDebugLevel, PayloadSemantics, Task
 from .program_group import ProgramGroup
 from .struct import SbtRecord, LaunchParamsRecord
 from .shader_binding_table import ShaderBindingTable

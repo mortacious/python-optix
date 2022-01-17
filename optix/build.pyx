@@ -31,15 +31,48 @@ class GeometryFlags(IntEnum):
     REQUIRE_SINGLE_ANYHIT_CALL = OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL
 
 
-class PrimitiveType(IntEnum):
+class BuildFlags(IntFlag):
     """
-    Wraps the OptixPrimitiveType enum.
+    Wraps the OptixBuildFlags enum
     """
-    CUSTOM = OPTIX_PRIMITIVE_TYPE_CUSTOM,
-    ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_ROUND_QUADRATIC_BSPLINE,
-    ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE,
-    ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR,
-    TRIANGLE = OPTIX_PRIMITIVE_TYPE_TRIANGLE
+    NONE = OPTIX_BUILD_FLAG_NONE,
+    ALLOW_UPDATE = OPTIX_BUILD_FLAG_ALLOW_UPDATE,
+    ALLOW_COMPACTION = OPTIX_BUILD_FLAG_ALLOW_COMPACTION,
+    PREFER_FAST_TRACE = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE,
+    PREFER_FAST_BUILD = OPTIX_BUILD_FLAG_PREFER_FAST_BUILD,
+    ALLOW_RANDOM_VERTEX_ACCESS = OPTIX_BUILD_FLAG_ALLOW_RANDOM_VERTEX_ACCESS,
+    ALLOW_RANDOM_INSTANCE_ACCESS = OPTIX_BUILD_FLAG_ALLOW_RANDOM_INSTANCE_ACCESS,
+
+
+IF _OPTIX_VERSION > 70300:  # switch to new instance flags
+    class PrimitiveType(IntEnum):
+        """
+        Wraps the OptixPrimitiveType enum.
+        """
+        CUSTOM = OPTIX_PRIMITIVE_TYPE_CUSTOM,
+        ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_ROUND_QUADRATIC_BSPLINE,
+        ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE,
+        ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR,
+        ROUND_CATMULLROM = OPTIX_PRIMITIVE_TYPE_ROUND_CATMULLROM,
+        TRIANGLE = OPTIX_PRIMITIVE_TYPE_TRIANGLE
+
+    class CurveEndcapFlags(IntEnum):
+        DEFAULT = OPTIX_CURVE_ENDCAP_DEFAULT,
+        ON = OPTIX_CURVE_ENDCAP_ON
+ELSE:
+    class CurveEndcapFlags(IntEnum):
+        DEFAULT = 0 # only for interface. Ignored for Optix versions below 7.4
+
+    class PrimitiveType(IntEnum):
+        """
+        Wraps the OptixPrimitiveType enum.
+        """
+        CUSTOM = OPTIX_PRIMITIVE_TYPE_CUSTOM,
+        ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_ROUND_QUADRATIC_BSPLINE,
+        ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE,
+        ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR,
+        TRIANGLE = OPTIX_PRIMITIVE_TYPE_TRIANGLE
+
 
 class InstanceFlags(IntFlag):
     """
@@ -50,7 +83,6 @@ class InstanceFlags(IntFlag):
     FLIP_TRIANGLE_FACING = OPTIX_INSTANCE_FLAG_FLIP_TRIANGLE_FACING,
     DISABLE_ANYHIT = OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT,
     ENFORCE_ANYHIT = OPTIX_INSTANCE_FLAG_ENFORCE_ANYHIT,
-    DISABLE_TRANSFORM = OPTIX_INSTANCE_FLAG_DISABLE_TRANSFORM
 
 
 cdef class BuildInputArray(OptixObject):
@@ -325,7 +357,8 @@ cdef class BuildInputCurveArray(BuildInputArray):
                  index_buffer,
                  normal_buffers = None,
                  flags=None,
-                 primitive_index_offset=0):
+                 primitive_index_offset=0,
+                 endcap_flags=CurveEndcapFlags.DEFAULT):
 
         self.build_input.curveType = curve_type.value
         self._d_vertex_buffers = [cp.asarray(vb, np.float32) for vb in ensure_iterable(vertex_buffers)]
@@ -385,6 +418,9 @@ cdef class BuildInputCurveArray(BuildInputArray):
 
         self.build_input.primitiveIndexOffset = primitive_index_offset
 
+        IF _OPTIX_VERSION > 70300:
+            self.build_input.endcapFlags = endcap_flags # only for Optix versions >= 7.4
+
     cdef void prepare_build_input(self, OptixBuildInput * build_input) except *:
         build_input.type = OPTIX_BUILD_INPUT_TYPE_CURVES
         build_input.curveArray = self.build_input
@@ -423,11 +459,9 @@ cdef class Instance(OptixObject):
                  visibility_mask=None):
         if transform is None:
             transform = np.eye(3, 4, dtype=np.float32)
-        transform = np.ascontiguousarray(np.asarray(transform, dtype=np.float32).reshape(3,4))
-        cdef float[:, ::1] c_transform = transform
-        memcpy(&self.instance.transform, &c_transform[0, 0], sizeof(float) * 12)
+        self.transform = transform
         self.traversable = traversable
-        self.instance.traversableHandle = self.traversable.handle
+
         self.instance.instanceId = instance_id
         self.instance.flags = flags.value
         self.instance.sbtOffset = sbt_offset
@@ -438,8 +472,14 @@ cdef class Instance(OptixObject):
             raise ValueError(f"Too many entries in visibility mask. Got {visibility_mask.bit_length()} but supported are only {max_visibility_mask_bits}")
         self.instance.visibilityMask = visibility_mask
 
-    def update_traversable(self, AccelerationStructure traversable):
-        self.traversable = traversable
+    @property
+    def traversable(self):
+        return self._traversable
+
+    @traversable.setter
+    def traversable(self, AccelerationStructure traversable):
+        self._traversable = traversable
+        # update the handle as well
         self.instance.traversableHandle = self.traversable.handle
 
     def __deepcopy__(self, memodict={}):
@@ -451,6 +491,17 @@ cdef class Instance(OptixObject):
         result.traversable = deepcopy(self.traversable)
 
         return result
+
+    @property
+    def transform(self):
+        cdef float [:] transform_view = self.instance.transform
+        return np.asarray(transform_view).reshape(3,4)
+
+    @transform.setter
+    def transform(self, tf):
+        transform = np.ascontiguousarray(np.asarray(tf, dtype=np.float32).reshape(3,4))
+        cdef float[:, ::1] c_transform = transform
+        memcpy(&self.instance.transform, &c_transform[0, 0], sizeof(float) * 12)
 
 
 cdef class BuildInputInstanceArray(BuildInputArray):
@@ -485,13 +536,48 @@ cdef class BuildInputInstanceArray(BuildInputArray):
 
     cdef size_t num_elements(self):
         return self.build_input.numInstances
-    
+
+    def __getitem__(self, index):
+        return self.instances[index]
+
+    def __setitem__(self, index, instance):
+        if not isinstance(instance, Instance):
+            raise TypeError("Only instance objects.")
+        self.instances[index] = instance
+        self.update_instance(index)
+
     def update_instance(self, index):
-        src_ptr = <size_t>&((<Instance>(self.instances[index])).instance)
+        """
+        Update the instance at index in gpu memory from the instances list in host memory.
+
+        Parameters
+        ----------
+        index: int
+            The index to update
+        """
+        # update the value in the cuda buffer
+        src_ptr = <size_t>&(<Instance>(self.instances[index])).instance
         dst_ptr = self._d_instances.ptr + index*sizeof(OptixInstance)
         cp.cuda.runtime.memcpy(dst_ptr, src_ptr, sizeof(OptixInstance), cp.cuda.runtime.memcpyHostToDevice)
 
-    def get_transform_view(self, index):
+    # TODO: still thinking of a better way to acomplish the transform access in an OO way.
+    def view_instance_transform(self, index):
+        """
+        Obtain a view of the transform parameter at index in gpu memory as a cupy array for direct modification
+
+        Parameters
+        ----------
+        index: int
+            The index of the transform this view should point to
+
+        Returns
+        -------
+        transform_view: cp.ndarray of shape (3, 4)
+            A view of the transform matrix
+
+        """
+        if index < 0 or index >=len(self.instances):
+            raise IndexError(f"Invalid index {index} for list of length {len(self.instances)}.")
         device_ptr = cp.cuda.MemoryPointer(mem=self._d_instances.mem, offset=<int>index*sizeof(OptixInstance))
         return cp.ndarray(shape=(3,4), dtype=np.float32, memptr=device_ptr)
 
@@ -800,6 +886,11 @@ cdef class AccelerationStructure(OptixContextObject):
 
     def _repr_details(self):
         return f"{self._num_elements} elements in {self._buffer_sizes.outputSizeInBytes} bytes"
+
+    @property
+    def build_flags(self):
+        return BuildFlags(self.build_flags)
+
 
 
 

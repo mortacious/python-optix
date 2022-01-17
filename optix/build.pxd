@@ -6,8 +6,6 @@ from libc.stdint cimport uintptr_t
 
 
 cdef extern from "optix.h" nogil:
-    # build functions and structs
-
     cdef enum OptixBuildFlags:
         OPTIX_BUILD_FLAG_NONE,
         OPTIX_BUILD_FLAG_ALLOW_UPDATE,
@@ -72,28 +70,56 @@ cdef extern from "optix.h" nogil:
         unsigned int sbtIndexOffsetStrideInBytes
         unsigned int primitiveIndexOffset
 
-    cdef enum OptixPrimitiveType:
-        OPTIX_PRIMITIVE_TYPE_CUSTOM,
-        OPTIX_PRIMITIVE_TYPE_ROUND_QUADRATIC_BSPLINE,
-        OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE,
-        OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR,
-        OPTIX_PRIMITIVE_TYPE_TRIANGLE,
+    IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 3:  # switch to new instance flags
+        cdef enum OptixPrimitiveType:
+            OPTIX_PRIMITIVE_TYPE_CUSTOM,
+            OPTIX_PRIMITIVE_TYPE_ROUND_QUADRATIC_BSPLINE,
+            OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE,
+            OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR,
+            OPTIX_PRIMITIVE_TYPE_ROUND_CATMULLROM,
+            OPTIX_PRIMITIVE_TYPE_TRIANGLE,
 
+        cdef enum OptixCurveEndcapFlags:
+            OPTIX_CURVE_ENDCAP_DEFAULT,
+            OPTIX_CURVE_ENDCAP_ON
 
-    cdef struct OptixBuildInputCurveArray:
-        OptixPrimitiveType curveType
-        unsigned int numPrimitives
-        const CUdeviceptr * vertexBuffers
-        unsigned int numVertices
-        unsigned int vertexStrideInBytes
-        const CUdeviceptr * widthBuffers
-        unsigned int widthStrideInBytes
-        const CUdeviceptr * normalBuffers
-        unsigned int normalStrideInBytes
-        CUdeviceptr indexBuffer
-        unsigned int indexStrideInBytes
-        unsigned int flag
-        unsigned int primitiveIndexOffset
+        cdef struct OptixBuildInputCurveArray:
+            OptixPrimitiveType curveType
+            unsigned int numPrimitives
+            const CUdeviceptr * vertexBuffers
+            unsigned int numVertices
+            unsigned int vertexStrideInBytes
+            const CUdeviceptr * widthBuffers
+            unsigned int widthStrideInBytes
+            const CUdeviceptr * normalBuffers
+            unsigned int normalStrideInBytes
+            CUdeviceptr indexBuffer
+            unsigned int indexStrideInBytes
+            unsigned int flag
+            unsigned int primitiveIndexOffset
+            unsigned int endcapFlags
+    ELSE:
+        cdef enum OptixPrimitiveType:
+            OPTIX_PRIMITIVE_TYPE_CUSTOM,
+            OPTIX_PRIMITIVE_TYPE_ROUND_QUADRATIC_BSPLINE,
+            OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE,
+            OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR,
+            OPTIX_PRIMITIVE_TYPE_TRIANGLE,
+
+        cdef struct OptixBuildInputCurveArray:
+            OptixPrimitiveType curveType
+            unsigned int numPrimitives
+            const CUdeviceptr * vertexBuffers
+            unsigned int numVertices
+            unsigned int vertexStrideInBytes
+            const CUdeviceptr * widthBuffers
+            unsigned int widthStrideInBytes
+            const CUdeviceptr * normalBuffers
+            unsigned int normalStrideInBytes
+            CUdeviceptr indexBuffer
+            unsigned int indexStrideInBytes
+            unsigned int flag
+            unsigned int primitiveIndexOffset
 
     cdef enum OptixIndicesFormat:
         OPTIX_INDICES_FORMAT_NONE,
@@ -167,13 +193,14 @@ cdef extern from "optix.h" nogil:
         OPTIX_TRAVERSABLE_TYPE_MATRIX_MOTION_TRANSFORM,
         OPTIX_TRAVERSABLE_TYPE_SRT_MOTION_TRANSFORM,
 
+
     cdef enum OptixInstanceFlags:
         OPTIX_INSTANCE_FLAG_NONE
         OPTIX_INSTANCE_FLAG_DISABLE_TRIANGLE_FACE_CULLING
         OPTIX_INSTANCE_FLAG_FLIP_TRIANGLE_FACING
         OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT
         OPTIX_INSTANCE_FLAG_ENFORCE_ANYHIT
-        OPTIX_INSTANCE_FLAG_DISABLE_TRANSFORM
+
 
     cdef struct OptixInstance:
         float transform [12]
@@ -276,12 +303,12 @@ cdef class BuildInputCurveArray(BuildInputArray):
 
 cdef class Instance(OptixObject):
     cdef OptixInstance instance
-    cdef AccelerationStructure traversable
+    cdef AccelerationStructure _traversable
 
 
 cdef class BuildInputInstanceArray(BuildInputArray):
     cdef OptixBuildInputInstanceArray build_input
-    cdef public object instances
+    cdef object instances
     cdef object _d_instances
 
 

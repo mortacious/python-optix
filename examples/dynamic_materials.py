@@ -194,7 +194,7 @@ def create_module(state):
     compile_opts = ox.ModuleCompileOptions(
             max_register_count=ox.ModuleCompileOptions.DEFAULT_MAX_REGISTER_COUNT,
             opt_level=ox.CompileOptimizationLevel.DEFAULT,
-            debug_level=ox.CompileDebugLevel.LINEINFO)
+            debug_level=ox.CompileDebugLevel.MODERATE)
 
     source = os.path.join(script_dir, 'cuda', 'dynamic_materials.cu')
     state.module = ox.Module(state.ctx, source, compile_opts, pipeline_opts)

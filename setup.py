@@ -1,6 +1,7 @@
 from setuptools import setup, Extension, find_packages
 from Cython.Build import cythonize
-
+import re
+from pathlib import Path
 
 # standalone import of a module (https://stackoverflow.com/a/58423785)
 def import_module_from_path(path):
@@ -29,8 +30,28 @@ optix_include_path = util.get_optix_include_path()
 if cuda_include_path is None or optix_include_path is None:
     raise RuntimeError("Cuda or optix not found in the system")
 
-extensions = [Extension("*", ["optix/*.pyx"], include_dirs=[cuda_include_path, optix_include_path])]
-extensions = cythonize(extensions, language_level="3")
+optix_version_re = re.compile(r'.*OPTIX_VERSION +(\d{5})')  # get the optix version from the header
+with open(Path(optix_include_path) / "optix.h", 'r') as f:
+    header_content = f.read()
+    optix_version = int(optix_version_re.search(header_content).group(1))
+
+optix_version_major = optix_version // 10000
+optix_version_minor = (optix_version % 10000) // 100
+optix_version_micro = optix_version % 100
+
+print(f"Found OptiX version {optix_version_major}.{optix_version_minor}.{optix_version_micro}.")
+
+cython_compile_env = {
+    '_OPTIX_VERSION': optix_version,
+    '_OPTIX_VERSION_MAJOR': optix_version_major,
+    '_OPTIX_VERSION_MINOR': optix_version_minor,
+    '_OPTIX_VERSION_MICRO': optix_version_micro
+}
+
+extensions = [Extension("*", ["optix/*.pyx"],
+                        include_dirs=[cuda_include_path, optix_include_path])]
+extensions = cythonize(extensions, language_level="3",
+                        compile_time_env=cython_compile_env)
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
