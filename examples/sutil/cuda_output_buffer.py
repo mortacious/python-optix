@@ -1,11 +1,11 @@
-import enum, re
+import enum
 
 import numpy as np
 import cupy as cp
 
 import OpenGL.GL as gl
 
-from optix.sutil.vecmath import vtype_to_dtype
+from .vecmath import vtype_to_dtype
 
 
 class BufferImageFormat(enum.Enum):

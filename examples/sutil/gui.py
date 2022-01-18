@@ -5,6 +5,7 @@ import OpenGL.GL as gl
 import imgui
 from imgui.integrations.glfw import GlfwRenderer
 
+
 def static_vars(**kwargs):
     """
     Attach a static variables local to decorated function.

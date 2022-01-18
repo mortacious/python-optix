@@ -4,7 +4,7 @@ import numpy as np
 import OpenGL.GL as gl
 import OpenGL.GL.shaders
 
-from optix.sutil.cuda_output_buffer import BufferImageFormat
+from .cuda_output_buffer import BufferImageFormat
 
 class GLDisplay:
     vert_source = \
@@ -49,6 +49,7 @@ void main()
             '_quad_vertex_buffer', '_image_format']
 
     def __init__(self, image_format):
+        print(image_format, type(image_format), isinstance(BufferImageFormat.UCHAR4, BufferImageFormat))
         assert isinstance(image_format, BufferImageFormat)
 
         vertex_array = gl.glGenVertexArrays(1)

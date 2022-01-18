@@ -2,9 +2,9 @@ import enum
 
 import numpy as np
 
-from optix.sutil.properties import get_member, set_bool, set_float, set_float3
-from optix.sutil.vecmath import dot, length, normalize
-from optix.sutil.camera import Camera
+from .properties import get_member, set_bool, set_float, set_float3
+from .vecmath import dot, length, normalize
+from .camera import Camera
 
 class TrackballViewMode(enum.Enum):
     EyeFixed = 0

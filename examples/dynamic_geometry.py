@@ -6,10 +6,10 @@ import optix as ox
 
 import glfw, imgui
 
-from optix.sutil.gui import init_ui, display_stats
-from optix.sutil.gl_display import GLDisplay
-from optix.sutil.trackball import Trackball, TrackballViewMode
-from optix.sutil.cuda_output_buffer import CudaOutputBuffer, CudaOutputBufferType, BufferImageFormat
+from sutil.gui import init_ui, display_stats
+from sutil.gl_display import GLDisplay
+from sutil.trackball import Trackball, TrackballViewMode
+from sutil.cuda_output_buffer import CudaOutputBuffer, CudaOutputBufferType, BufferImageFormat
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 

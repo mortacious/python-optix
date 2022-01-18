@@ -3,6 +3,7 @@ from Cython.Build import cythonize
 import re
 from pathlib import Path
 
+
 # standalone import of a module (https://stackoverflow.com/a/58423785)
 def import_module_from_path(path):
     """Import a module from the given path without executing any code above it
