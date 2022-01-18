@@ -19,7 +19,8 @@ __all__ = ['GeometryFlags',
            'BuildInputCurveArray',
            'BuildInputInstanceArray',
            'Instance',
-           'AccelerationStructure'
+           'AccelerationStructure',
+           'CurveEndcapFlags'
            ]
 
 class GeometryFlags(IntEnum):
