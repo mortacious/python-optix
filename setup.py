@@ -91,7 +91,7 @@ setup(
         "Topic :: Software Development",
     ],
     extras_require={
-        'examples': ["pillow"]
+        'examples': ["pillow", "pyopengl", "pyglfw", "pyimgui"]
     },
     python_requires=">=3.8",
     zip_safe=False
