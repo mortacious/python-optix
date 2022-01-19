@@ -37,8 +37,6 @@ if __name__ == "__main__":
 
     # a color image is always required
     color_image = imageio.read(args.color_file).get_data(0)
-    plt.imshow(np.clip(color_image, 0, 255).astype(np.uint8))
-    plt.show()
     normal_image = None
     albedo_image = None
     flow_image = None
@@ -60,6 +58,11 @@ if __name__ == "__main__":
     ret = denoiser.invoke(color_image, albedo=albedo_image if args.albedo else None, normals=normal_image if args.normal else None)
     ret = cp.asnumpy(ret)
 
+    fig, axs = plt.subplots(nrows=2, sharex=True, sharey=True)
+    axs[0].imshow(np.clip(color_image, 0, 255).astype(np.uint8))
+    axs[0].set_title("original")
+
     ret = np.clip(ret, 0, 255).astype(np.uint8)
-    plt.imshow(ret)
+    axs[1].imshow(ret)
+    axs[1].set_title("denoised")
     plt.show()
