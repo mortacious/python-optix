@@ -1,5 +1,6 @@
 import optix as ox
 import cupy as cp
+import numpy as np
 import argparse
 import logging
 import sys
@@ -34,10 +35,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-
     # a color image is always required
     color_image = imageio.read(args.color_file).get_data(0)
-    plt.imshow(color_image / 10000)
+    plt.imshow(np.clip(color_image, 0, 255).astype(np.uint8))
     plt.show()
     normal_image = None
     albedo_image = None
@@ -60,6 +60,6 @@ if __name__ == "__main__":
     ret = denoiser.invoke(color_image, albedo=albedo_image if args.albedo else None, normals=normal_image if args.normal else None)
     ret = cp.asnumpy(ret)
 
-    ret /= 10000
+    ret = np.clip(ret, 0, 255).astype(np.uint8)
     plt.imshow(ret)
     plt.show()
