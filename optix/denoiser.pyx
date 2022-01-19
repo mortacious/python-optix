@@ -208,10 +208,10 @@ cdef class Denoiser(OptixContextObject):
     @classmethod
     def create_with_user_model(cls, DeviceContext context, unsigned char[::1] user_model not None):
         obj = cls(context, model_kind=None)
-        optix_check_return(optixDenoiserCreateWithUserModel(obj.context.c_context,
+        optix_check_return(optixDenoiserCreateWithUserModel((<Denoiser>obj).context.c_context,
                                                             &user_model[0],
                                                             user_model.nbytes,
-                                                            &obj.denoiser))
+                                                            &(<Denoiser>obj).denoiser))
         return obj
 
     def invoke(self,
