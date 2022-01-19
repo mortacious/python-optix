@@ -3,14 +3,22 @@ from .context cimport OptixDeviceContext, OptixContextObject
 from libcpp.vector cimport vector
 from .base cimport OptixObject
 from libc.stdint cimport uintptr_t
+from libcpp cimport bool
 
 cdef extern from "optix_includes.h" nogil:
-    cdef enum OptixDenoiserModelKind:
-        OPTIX_DENOISER_MODEL_KIND_LDR
-        OPTIX_DENOISER_MODEL_KIND_HDR
-        OPTIX_DENOISER_MODEL_KIND_AOV
-        OPTIX_DENOISER_MODEL_KIND_TEMPORAL
-        OPTIX_DENOISER_MODEL_KIND_TEMPORAL_AOV
+    IF _OPTIX_VERSION > 70300:
+        cdef enum OptixDenoiserModelKind:
+            OPTIX_DENOISER_MODEL_KIND_LDR
+            OPTIX_DENOISER_MODEL_KIND_HDR
+            OPTIX_DENOISER_MODEL_KIND_AOV
+            OPTIX_DENOISER_MODEL_KIND_TEMPORAL
+            OPTIX_DENOISER_MODEL_KIND_TEMPORAL_AOV
+    ELSE:
+        cdef enum OptixDenoiserModelKind:
+            OPTIX_DENOISER_MODEL_KIND_LDR
+            OPTIX_DENOISER_MODEL_KIND_HDR
+            OPTIX_DENOISER_MODEL_KIND_AOV
+            OPTIX_DENOISER_MODEL_KIND_TEMPORAL
 
 
     cdef struct OptixDenoiserOptions:
@@ -57,7 +65,8 @@ cdef extern from "optix_includes.h" nogil:
         OptixImage2D normal
         OptixImage2D flow
 
-    ctypedef uintptr_t OptixDenoiser
+    ctypedef struct OptixDenoiser:
+        pass
 
     OptixResult optixDenoiserCreate(OptixDeviceContext context,
                                     OptixDenoiserModelKind modelKind,
@@ -118,18 +127,66 @@ cdef extern from "optix_includes.h" nogil:
             CUdeviceptr         scratch,
             size_t              scratchSizeInBytes)
 
+cdef extern from "optix_denoiser_tiling.h" nogil:
+    OptixResult optixUtilDenoiserInvokeTiled(OptixDenoiser denoiser,
+                                             CUstream stream,
+                                             const OptixDenoiserParams *params,
+                                             CUdeviceptr denoiserState,
+                                             size_t denoiserStateSizeInBytes,
+                                             const OptixDenoiserGuideLayer *guideLayer,
+                                             const OptixDenoiserLayer *layers,
+                                             unsigned int numLayers,
+                                             CUdeviceptr scratch,
+                                             size_t scratchSizeInBytes,
+                                             unsigned int overlapWindowSizeInPixels,
+                                             unsigned int tileWidth,
+                                             unsigned int tileHeight)
 
-class Image2D(OptixObject):
+    cdef struct OptixUtilDenoiserImageTile:
+        OptixImage2D input
+        OptixImage2D output
+        unsigned int inputOffsetX
+        unsigned int inputOffsetY
+
+    OptixResult optixUtilDenoiserSplitImage(const OptixImage2D & input,
+                                            const OptixImage2D & output,
+                                            unsigned int overlapWindowSizeInPixels, unsigned int tileWidth,
+                                            unsigned int tileHeight,
+                                            vector[OptixUtilDenoiserImageTile]& tiles)
+
+    unsigned int optixUtilGetPixelStride(const OptixImage2D & image)
+
+
+
+cdef class Image2D(OptixObject):
     cdef OptixImage2D image
     cdef object _d_data
 
-class DenoiserLayer(OptixObject):
+cdef class DenoiserLayer(OptixObject):
     cdef OptixDenoiserLayer layer
     cdef Image2D input
     cdef Image2D previous_output
     cdef Image2D output
 
-class Denoiser(OptixContextObject):
+cdef class DenoiserGuideLayer(OptixObject):
+    cdef OptixDenoiserGuideLayer layer
+    cdef Image2D albedo
+    cdef Image2D normal
+    cdef Image2D flow
+
+cdef class Denoiser(OptixContextObject):
     cdef OptixDenoiser denoiser
+    cdef object model_kind
     cdef bool guide_albedo
     cdef bool guide_normals
+    cdef bool kp_mode
+    cdef tuple tile_size
+    cdef object _d_state
+    cdef size_t _state_size
+    cdef object _d_scratch
+    cdef size_t _scratch_size
+    cdef object _d_window
+    cdef size_t _window_size
+    cdef object _d_intensity
+    cdef object _d_avg_color
+    cdef unsigned int _overlap
