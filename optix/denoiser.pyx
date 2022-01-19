@@ -4,8 +4,7 @@ from .common cimport optix_check_return, optix_init
 from .context cimport DeviceContext
 import cupy as cp
 import numpy as np
-from enum import IntEnum, IntFlag
-from libc.string cimport memcpy, memset
+from enum import IntEnum
 from libcpp.vector cimport vector
 from .common import ensure_iterable
 
@@ -148,7 +147,7 @@ cdef class Denoiser(OptixContextObject):
         self._state_size = 0
 
         if model_kind is not None:
-            self.model_kind = model_kind
+            self.model_kind = DenoiserModelKind(model_kind)
             options.guideAlbedo = 1 if guide_albedo else 0
             options.guideNormal = 1 if guide_normals else 0
 
@@ -207,14 +206,13 @@ cdef class Denoiser(OptixContextObject):
 
 
     @classmethod
-    def create_with_user_model(cls, DeviceContext context, user_model):
-        raise NotImplementedError()
-        #obj = cls(context, model_kind=None)
-        #optix_check_return(optixDenoiserCreateWithUserModel(obj.context.c_context,
-        #                                                    user_model, #TODO
-        #                                                    len(user_model), #TODO
-        #                                                    &obj.denoiser))
-        #return obj
+    def create_with_user_model(cls, DeviceContext context, unsigned char[::1] user_model not None):
+        obj = cls(context, model_kind=None)
+        optix_check_return(optixDenoiserCreateWithUserModel(obj.context.c_context,
+                                                            &user_model[0],
+                                                            user_model.nbytes,
+                                                            &obj.denoiser))
+        return obj
 
     def invoke(self,
                inputs,
