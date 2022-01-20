@@ -341,7 +341,6 @@ def create_module(state):
     else:
         exception_flags=ox.ExceptionFlags.NONE
 
-    print("Triangle value", ox.PrimitiveTypeFlags.TRIANGLE.value)
     pipeline_opts = ox.PipelineCompileOptions(
             uses_motion_blur=False,
             uses_primitive_type_flags =ox.PrimitiveTypeFlags.TRIANGLE,
@@ -414,7 +413,7 @@ if __name__ == '__main__':
     animation_time = 1.0
 
     buffer_format = BufferImageFormat.UCHAR4
-    output_buffer_type = CudaOutputBufferType.CUDA_DEVICE
+    output_buffer_type = CudaOutputBufferType.enable_gl_interop()
 
     init_camera_state(state)
     create_context(state)
