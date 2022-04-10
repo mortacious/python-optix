@@ -18,6 +18,16 @@ log = logging.getLogger()
 
 DEBUG=False
 
+if DEBUG:
+    exception_flags=ox.ExceptionFlags.DEBUG | ox.ExceptionFlags.TRACE_DEPTH | ox.ExceptionFlags.STACK_OVERFLOW,
+    debug_level = ox.CompileDebugLevel.FULL
+    opt_level = ox.CompileOptimizationLevel.LEVEL_0
+else:
+    exception_flags=ox.ExceptionFlags.NONE
+    debug_level = ox.CompileDebugLevel.MINIMAL
+    opt_level = ox.CompileOptimizationLevel.LEVEL_3
+
+
 #------------------------------------------------------------------------------
 # Local types
 #------------------------------------------------------------------------------
@@ -336,15 +346,9 @@ def build_mesh_accel(state):
 
 
 def create_module(state):
-    if DEBUG:
-        exception_flags=ox.ExceptionFlags.DEBUG | ox.ExceptionFlags.TRACE_DEPTH | ox.ExceptionFlags.STACK_OVERFLOW,
-    else:
-        exception_flags=ox.ExceptionFlags.NONE
-
-    print("Triangle value", ox.PrimitiveTypeFlags.TRIANGLE.value)
     pipeline_opts = ox.PipelineCompileOptions(
             uses_motion_blur=False,
-            uses_primitive_type_flags =ox.PrimitiveTypeFlags.TRIANGLE,
+            uses_primitive_type_flags=ox.PrimitiveTypeFlags.TRIANGLE,
             traversable_graph_flags=ox.TraversableGraphFlags.ALLOW_SINGLE_LEVEL_INSTANCING,
             exception_flags=exception_flags,
             num_payload_values=3,
@@ -353,8 +357,7 @@ def create_module(state):
 
     compile_opts = ox.ModuleCompileOptions(
             max_register_count=ox.ModuleCompileOptions.DEFAULT_MAX_REGISTER_COUNT,
-            opt_level=ox.CompileOptimizationLevel.DEFAULT,
-            debug_level=ox.CompileDebugLevel.MODERATE)
+            opt_level=opt_level, debug_level=debug_level)
 
     cuda_source = os.path.join(script_dir, 'cuda', 'dynamic_geometry.cu')
     state.module = ox.Module(state.ctx, cuda_source, compile_opts, pipeline_opts)
@@ -371,7 +374,7 @@ def create_pipeline(state):
     program_grps = [state.raygen_grp, state.miss_grp, state.hit_grp]
 
     link_opts = ox.PipelineLinkOptions(max_trace_depth=1,
-                                       debug_level=ox.CompileDebugLevel.MODERATE)
+                                       debug_level=debug_level)
 
     pipeline = ox.Pipeline(state.ctx,
                            compile_options=state.pipeline_opts,
@@ -414,7 +417,7 @@ if __name__ == '__main__':
     animation_time = 1.0
 
     buffer_format = BufferImageFormat.UCHAR4
-    output_buffer_type = CudaOutputBufferType.CUDA_DEVICE
+    output_buffer_type = CudaOutputBufferType.enable_gl_interop()
 
     init_camera_state(state)
     create_context(state)

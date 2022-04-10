@@ -49,7 +49,6 @@ void main()
             '_quad_vertex_buffer', '_image_format']
 
     def __init__(self, image_format):
-        print(image_format, type(image_format), isinstance(BufferImageFormat.UCHAR4, BufferImageFormat))
         assert isinstance(image_format, BufferImageFormat)
 
         vertex_array = gl.glGenVertexArrays(1)
