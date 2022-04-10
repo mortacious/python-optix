@@ -1,11 +1,15 @@
+import os, sys, logging
 import optix as ox
 import cupy as cp
 import numpy as np
 from PIL import Image, ImageOps
-import logging
-import sys
+
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 log = logging.getLogger()
+
+script_dir = os.path.dirname(__file__)
+cuda_src = os.path.join(script_dir, "cuda", "spheres.cu")
+
 img_size = (1024, 768)
 
 def compute_spheres_bbox(centers, radii):
@@ -23,7 +27,7 @@ def create_acceleration_structure(ctx, bboxes):
 
 def create_module(ctx, pipeline_opts):
     compile_opts = ox.ModuleCompileOptions(debug_level=ox.CompileDebugLevel.FULL, opt_level=ox.CompileOptimizationLevel.LEVEL_0)
-    module = ox.Module(ctx, 'cuda/spheres.cu', compile_opts, pipeline_opts)
+    module = ox.Module(ctx, cuda_src, compile_opts, pipeline_opts)
     return module
 
 

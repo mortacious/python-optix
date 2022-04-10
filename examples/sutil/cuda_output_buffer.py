@@ -1,4 +1,5 @@
-import enum
+import sys, os, enum
+from packaging import version
 
 import numpy as np
 import cupy as cp
@@ -6,6 +7,49 @@ import cupy as cp
 import OpenGL.GL as gl
 
 from .vecmath import vtype_to_dtype
+
+try:
+    import cuda as _cuda
+    from cuda import cudart
+    has_cudart = True
+    has_gl_interop = version.parse(_cuda.__version__) >= version.parse("11.6.0")
+except ImportError:
+    cudart = None
+    has_cudart = False
+    has_gl_interop = False
+
+_cuda_opengl_interop_msg = (
+    "Cuda Python low level bindings v11.6.0 or later are required to enable "
+   f"Cuda/OpenGL interoperability.{os.linesep}You can install the missing package with:"
+   f"{os.linesep}  {sys.executable} -m pip install --upgrade --user cuda-python"
+)
+
+if has_cudart:
+    def format_cudart_err(err):
+        return (
+            f"{cudart.cudaGetErrorName(err)[1].decode('utf-8')}({int(err)}): "
+            f"{cudart.cudaGetErrorString(err)[1].decode('utf-8')}"
+        )
+
+
+    def check_cudart_err(args):
+        if isinstance(args, tuple):
+            assert len(args) >= 1
+            err = args[0]
+            if len(args) == 1:
+                ret = None
+            elif len(args) == 2:
+                ret = args[1]
+            else:
+                ret = args[1:]
+        else:
+            ret = None
+
+        assert isinstance(err, cudart.cudaError_t), type(err)
+        if err != cudart.cudaError_t.cudaSuccess:
+            raise RuntimeError(format_cudart_err(err))
+
+        return ret
 
 
 class BufferImageFormat(enum.Enum):
@@ -35,11 +79,22 @@ class CudaOutputBufferType(enum.Enum):
     ZERO_COPY   = 2,  # general case, preferred for multi-gpu if not fully nvlink connected
     CUDA_P2P    = 3,  # fully connected only, preferred for fully nvlink connected
 
+    @classmethod
+    def enable_gl_interop(cls, fallback=True):
+        if has_gl_interop:
+            return cls.GL_INTEROP
+        elif fallback:
+            msg = _cuda_opengl_interop_msg + f"{os.linesep}Falling back to slower CUDA_DEVICE output buffer."
+            print(msg)
+            return cls.CUDA_DEVICE
+        else:
+            raise RuntimeError(_cuda_opengl_interop_msg)
+
 
 class CudaOutputBuffer:
     __slots__ = ['_pixel_format', '_buffer_type', '_width', '_height',
             '_device', '_device_idx', '_device', '_stream',
-            '_host_buffer', '_device_buffer', '_pbo']
+            '_host_buffer', '_device_buffer', '_cuda_gfx_ressource', '_pbo']
 
     def __init__(self, buffer_type, pixel_format, width, height, device_idx=0):
         for attr in self.__slots__:
@@ -50,6 +105,16 @@ class CudaOutputBuffer:
         self.buffer_type = buffer_type
         self.resize(width, height)
         self.stream = None
+        
+        if buffer_type is CudaOutputBufferType.GL_INTEROP:
+            if not has_gl_interop:
+                raise RuntimeError(_cuda_opengl_interop_msg)
+            device_count, device_ids = check_cudart_err( cudart.cudaGLGetDevices(1, cudart.cudaGLDeviceList.cudaGLDeviceListAll) )
+            if device_count <= 0:
+                raise RuntimeError("No OpenGL device found, cannot enable GL_INTEROP.")
+            elif device_ids[0] != device_idx:
+                raise RuntimeError(f"OpenGL device id {device_ids[0]} does not match requested "
+                                   f"device index {device_idx} for Cuda/OpenGL interop.")
 
         self._reallocate_buffers()
 
@@ -69,13 +134,29 @@ class CudaOutputBuffer:
         self._make_current()
         if (self._host_buffer is None) or (self._device_buffer is None):
             self._reallocate_buffers()
-        return self._device_buffer.data.ptr
+        if self.buffer_type is CudaOutputBufferType.CUDA_DEVICE:
+            return self._device_buffer.data.ptr
+        elif self.buffer_type is CudaOutputBufferType.GL_INTEROP:
+            check_cudart_err(
+                cudart.cudaGraphicsMapResources(1, self._cuda_gfx_ressource, self._stream.ptr)
+            )
+            ptr, size = check_cudart_err(
+                cudart.cudaGraphicsResourceGetMappedPointer(self._cuda_gfx_ressource)
+            )
+            return ptr
+        else:
+            msg = f'Buffer type {self.buffer_type} has not been implemented yet.'
+            raise NotImplementedError(msg)
 
     def unmap(self):
         self._make_current()
         buffer_type = self.buffer_type
         if buffer_type is CudaOutputBufferType.CUDA_DEVICE:
             self._stream.synchronize()
+        elif buffer_type is CudaOutputBufferType.GL_INTEROP:
+            check_cudart_err(
+                cudart.cudaGraphicsUnmapResources(1, self._cuda_gfx_ressource, self._stream.ptr)
+            )
         else:
             msg = f'Buffer type {buffer_type} has not been implemented yet.'
             raise NotImplementedError(msg)
@@ -85,12 +166,13 @@ class CudaOutputBuffer:
 
         self._make_current()
 
-        if self._pbo is None:
-            self._pbo = gl.glGenBuffers(1)
-
         if buffer_type is CudaOutputBufferType.CUDA_DEVICE:
+            if self._pbo is None:
+                self._pbo = gl.glGenBuffers(1)
             self.copy_device_to_host()
             self.copy_host_to_pbo()
+        elif buffer_type is CudaOutputBufferType.GL_INTEROP:
+            assert self._pbo is not None
         else:
             msg = f'Buffer type {buffer_type} has not been implemented yet.'
             raise NotImplementedError(msg)
@@ -121,14 +203,26 @@ class CudaOutputBuffer:
 
         dtype = self.pixel_format
         shape = (self.height, self.width)
+        
+        self._host_buffer = np.empty(shape=shape, dtype=dtype)
 
         if buffer_type is CudaOutputBufferType.CUDA_DEVICE:
-            self._host_buffer = np.empty(shape=shape, dtype=dtype)
             self._device_buffer = cp.empty(shape=shape, dtype=dtype)
             if self._pbo is not None:
                 gl.glBindBuffer(gl.GL_ARRAY_BUFFER, self._pbo)
                 gl.glBufferData(gl.GL_ARRAY_BUFFER, self._host_buffer, gl.GL_STREAM_DRAW)
                 gl.glBindBuffer(gl.GL_ARRAY_BUFFER, 0)
+        elif buffer_type is CudaOutputBufferType.GL_INTEROP:
+            self._pbo = gl.glGenBuffers(1) if self._pbo is None else self._pbo
+            
+            gl.glBindBuffer(gl.GL_ARRAY_BUFFER, self._pbo)
+            gl.glBufferData(gl.GL_ARRAY_BUFFER, self.width*self.height*dtype.itemsize, None, gl.GL_STREAM_DRAW)
+            gl.glBindBuffer(gl.GL_ARRAY_BUFFER, 0)
+        
+            self.cuda_gfx_ressource = check_cudart_err(
+                cudart.cudaGraphicsGLRegisterBuffer(self._pbo,
+                    cudart.cudaGraphicsRegisterFlags.cudaGraphicsRegisterFlagsWriteDiscard)
+            )
         else:
             msg = f'Buffer type {buffer_type} has not been implemented yet.'
             raise NotImplementedError(msg)
@@ -215,3 +309,15 @@ class CudaOutputBuffer:
         assert isinstance(value, cp.cuda.Stream), type(value)
         self._stream = value
     stream = property(_get_stream, _set_stream)
+    
+    def _get_cuda_gfx_ressource(self):
+        assert self._cuda_gfx_ressource is not None
+        return self._cuda_gfx_ressource
+    def _set_cuda_gfx_ressource(self, value):
+        if (self._cuda_gfx_ressource is not None) and (self._cuda_gfx_ressource != value):
+            check_cudart_err(
+                cudart.cudaGraphicsUnregisterResource(self._cuda_gfx_ressource)
+            )
+        self._cuda_gfx_ressource = value
+
+    cuda_gfx_ressource = property(_get_cuda_gfx_ressource, _set_cuda_gfx_ressource)
