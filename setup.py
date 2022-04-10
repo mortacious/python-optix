@@ -1,6 +1,7 @@
 from setuptools import setup, Extension, find_packages
 from Cython.Build import cythonize
 import re
+import os
 from pathlib import Path
 
 
@@ -49,8 +50,13 @@ cython_compile_env = {
     '_OPTIX_VERSION_MICRO': optix_version_micro
 }
 
+libraries=[]
+if os.name == 'nt':
+    # OptiX uses some Windows Registry API(e.g. RegCloseKey)
+    libraries.append('advapi32')
+
 extensions = [Extension("*", ["optix/*.pyx"],
-                        include_dirs=[cuda_include_path, optix_include_path])]
+                        include_dirs=[cuda_include_path, optix_include_path], libraries=libraries)]
 extensions = cythonize(extensions, language_level="3",
                         compile_time_env=cython_compile_env, build_dir="build")
 

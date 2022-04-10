@@ -1,5 +1,9 @@
 #pragma once
 
+#if defined(_MSC_VER)
+#define NOMINMAX
+#endif
+
 #include <optix.h>
 #include <optix_stubs.h>
 #include <optix_function_table_definition.h>
