@@ -237,13 +237,19 @@ cdef class Module(OptixContextObject):
                  src,
                  ModuleCompileOptions module_compile_options = ModuleCompileOptions(),
                  PipelineCompileOptions pipeline_compile_options = PipelineCompileOptions(),
-                 compile_flags=_nvrtc_compile_flags_default,
+                 compile_flags=None,
                  program_name=None):
         super().__init__(context)
         cdef const char * c_ptx
         cdef unsigned int pipeline_payload_values, i
+
+        if compile_flags is None:
+            compile_flags = _nvrtc_compile_flags_default
+
         self._compile_flags = list(compile_flags)
 
+        if module_compile_options.debug_level != CompileDebugLevel.NONE:
+            self._compile_flags.append("-G")
         if src is not None:
             ptx = self.compile_cuda_ptx(src, compile_flags, name=program_name)
             c_ptx = ptx
@@ -377,6 +383,10 @@ cdef class Module(OptixContextObject):
                                                    &pipeline_compile_options.compile_options,
                                                    &builtin_is_options.options, &module.module))
         return module
+
+    @staticmethod
+    def get_default_nvrtc_compile_flags(std=None, rdc=False):
+        return get_default_nvrtc_compile_flags(std, rdc)
 
     @staticmethod
     def compile_cuda_ptx(src, compile_flags=_nvrtc_compile_flags_default, name=None, **kwargs):

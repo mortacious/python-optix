@@ -18,8 +18,7 @@ def  _aligned_itemsize( formats, alignment ):
     temp_dtype = np.dtype( {
         'names'   : names,
         'formats' : formats,
-        'align'   : True
-        } )
+        }, align=True)
     return round_up( temp_dtype.itemsize, alignment )
 
 def array_to_device_memory(numpy_array, stream=None):
@@ -175,9 +174,8 @@ cdef class _StructHelper:
             'names': names,
             'formats': formats,
             'itemsize': itemsize,
-            'align': True
-        })
-
+        }, align=True)
+        assert dtype.isalignedstruct
         return dtype
 
     def _prepare_array(self, array):
