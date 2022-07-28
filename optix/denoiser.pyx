@@ -1,4 +1,5 @@
 # distutils: language = c++
+import enum
 
 from .common cimport optix_check_return, optix_init
 from .context cimport DeviceContext
@@ -14,6 +15,14 @@ __all__ = ['DenoiserModelKind',
            'Denoiser'
            ]
 
+IF _OPTIX_VERSION > 70400:
+    class DenoiserAlphaMode(enum.IntEnum):
+        COPY = OPTIX_DENOISER_ALPHA_MODE_COPY
+        ALPHA_AS_AOV = OPTIX_DENOISER_ALPHA_MODE_ALPHA_AS_AOV
+        FULL_DENOISE_PASS = OPTIX_DENOISER_ALPHA_MODE_FULL_DENOISE_PASS
+
+    __all__.append('DenoiserAlphaMode')
+
 class DenoiserModelKind(IntEnum):
     """
     Wraps the OptixDenoiserModelKind enum.
@@ -25,9 +34,14 @@ class DenoiserModelKind(IntEnum):
 
     IF _OPTIX_VERSION > 70300:
         TEMPORAL_AOV = OPTIX_DENOISER_MODEL_KIND_TEMPORAL_AOV
+    IF _OPTIX_VERSION > 70400:
+        UPSCALE2X = OPTIX_DENOISER_MODEL_KIND_UPSCALE2X
+        TEMPORAL_UPSCALE2X = OPTIX_DENOISER_MODEL_KIND_TEMPORAL_UPSCALE2X
 
     def temporal_mode(self):
-        IF _OPTIX_VERSION > 70300:
+        IF _OPTIX_VERSION > 70400:
+            return self == self.TEMPORAL or self==self.TEMPORAL_AOV or self == self.TEMPORAL_UPSCALE2X
+        ELIF _OPTIX_VERSION > 70300:
             return self == self.TEMPORAL or self == self.TEMPORAL_AOV
         ELSE:
             return self == self.TEMPORAL
@@ -144,6 +158,9 @@ cdef class Denoiser(OptixContextObject):
         self.kp_mode = kp_mode
         self.tile_size = tile_size
         self._scratch_size = 0
+
+        self._guide_layer_scratch_size = 0
+        self._average_color_scratch_size = 0
         self._state_size = 0
 
         if model_kind is not None:
@@ -188,6 +205,13 @@ cdef class Denoiser(OptixContextObject):
             self._state_size = return_sizes.stateSizeInBytes
             self._d_state = cp.cuda.alloc(return_sizes.stateSizeInBytes)
 
+        IF _OPTIX_VERSION > 70400:
+            self._intensity_scratch_size = return_sizes.computeIntensitySizeInBytes
+            self._average_color_scratch_size = return_sizes.computeAverageColorSizeInBytes
+        ELSE:
+            self._intensity_scratch_size = self._scratch_size
+            self._average_color_scratch_size = self._scratch_size
+
         cdef uintptr_t c_stream = 0
 
         if stream is not None:
@@ -221,9 +245,10 @@ cdef class Denoiser(OptixContextObject):
                normals=None,
                flow=None,
                outputs=None,
-               denoise_alpha=False,
+               denoise_alpha=None,
                blend_factor=0.0,
-               stream=None):
+               stream=None,
+               temporal_use_previous_layer=False):
 
         accepted_input_types = (PixelFormat.FLOAT3, PixelFormat.FLOAT3, PixelFormat.HALF3, PixelFormat.HALF4)
         inputs = [Image2D(inp, require_type=accepted_input_types) for inp in ensure_iterable(inputs)]
@@ -284,10 +309,19 @@ cdef class Denoiser(OptixContextObject):
         self._init_denoiser(len(inputs), input_size, stream=stream)
 
         cdef OptixDenoiserParams params
-        params.denoiseAlpha = 1 if denoise_alpha else 0
         params.hdrIntensity = <CUdeviceptr>self._d_intensity.ptr if self._d_intensity is not None else 0
         params.hdrAverageColor = <CUdeviceptr>self._d_avg_color.ptr if self._d_avg_color is not None else 0
         params.blendFactor = blend_factor
+
+        IF _OPTIX_VERSION > 70400:
+            params.temporalModeUsePreviousLayers = 1 if temporal_use_previous_layer and temporal_mode else 0
+            if denoise_alpha is None:
+                denoise_alpha = DenoiserAlphaMode.COPY
+
+            assert isinstance(denoise_alpha, DenoiserAlphaMode), "Optix >7.5 changed this from a boolean variable into an enum"
+            params.denoiseAlpha = denoise_alpha.value
+        ELSE:
+            params.denoiseAlpha = 1 if denoise_alpha else 0
 
 
         cdef uintptr_t c_stream = 0
@@ -297,13 +331,14 @@ cdef class Denoiser(OptixContextObject):
 
         # determinhe intensity and avg color if needed
         if self._d_intensity is not None:
+
             optix_check_return(optixDenoiserComputeIntensity(
                 self.denoiser,
                 <CUstream>c_stream,
                 &layers[0].input,
                 self._d_intensity.ptr,
                 self._d_scratch.ptr,
-                self._scratch_size))
+                self._intensity_scratch_size))
 
         if self._d_avg_color is not None:
             optix_check_return(optixDenoiserComputeAverageColor(
@@ -312,7 +347,7 @@ cdef class Denoiser(OptixContextObject):
                 &layers[0].input,
                 self._d_avg_color,
                 self._d_scratch.ptr,
-                self._scratch_size))
+                self._average_color_scratch_size))
 
 
         if self.tile_size is None:

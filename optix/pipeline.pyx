@@ -36,7 +36,25 @@ class TraversableGraphFlags(IntFlag):
     ALLOW_SINGLE_LEVEL_INSTANCING = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING
 
 
-IF _OPTIX_VERSION > 70300:  # switch to new instance flags
+class PrimitiveTypeFlags(IntFlag):
+    """
+    Wraps the OptixPrimitiveTypeFlags enum.
+    """
+    DEFAULT = 0, # corresponds to CUSTOM | TRIANGLE
+    CUSTOM = OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM,
+    ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE,
+    ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
+    ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR
+
+    # switch to new primitive type flags
+    IF _OPTIX_VERSION > 70300:  # switch to new compile debug level flags
+        ROUND_CATMULLROM = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CATMULLROM
+    IF _OPTIX_VERSION > 70400:
+        SPHERE = OPTIX_PRIMITIVE_TYPE_FLAGS_SPHERE
+    TRIANGLE = <unsigned int>OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE # fixes negative number error
+
+
+IF _OPTIX_VERSION > 70300:  # switch to new compile debug level flags
     class CompileDebugLevel(IntEnum):
         """
         Wraps the OptixCompileDebugLevel enum.
@@ -46,18 +64,6 @@ IF _OPTIX_VERSION > 70300:  # switch to new instance flags
         MINIMAL = OPTIX_COMPILE_DEBUG_LEVEL_MINIMAL,
         MODERATE = OPTIX_COMPILE_DEBUG_LEVEL_MODERATE,
         FULL = OPTIX_COMPILE_DEBUG_LEVEL_FULL
-
-    class PrimitiveTypeFlags(IntFlag):
-        """
-        Wraps the OptixPrimitiveTypeFlags enum.
-        """
-        DEFAULT = 0, # corresponds to CUSTOM | TRIANGLE
-        CUSTOM = OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM,
-        ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE,
-        ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
-        ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR,
-        ROUND_CATMULLROM = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CATMULLROM,
-        TRIANGLE = <unsigned int>OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE # fixes negative number error
 ELSE:
     class CompileDebugLevel(IntEnum):
         """
@@ -67,17 +73,6 @@ ELSE:
         NONE = OPTIX_COMPILE_DEBUG_LEVEL_NONE,
         LINEINFO = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO,
         FULL = OPTIX_COMPILE_DEBUG_LEVEL_FULL
-
-    class PrimitiveTypeFlags(IntFlag):
-        """
-        Wraps the OptixPrimitiveTypeFlags enum.
-        """
-        DEFAULT = 0, # corresponds to CUSTOM | TRIANGLE
-        CUSTOM = OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM,
-        ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE,
-        ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
-        ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR,
-        TRIANGLE = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE
 
 
 cdef class PipelineCompileOptions(OptixObject):

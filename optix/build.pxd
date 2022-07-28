@@ -70,7 +70,16 @@ cdef extern from "optix.h" nogil:
         unsigned int sbtIndexOffsetStrideInBytes
         unsigned int primitiveIndexOffset
 
-    IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 3:  # switch to new instance flags
+    IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 4:  # switch to new instance flags
+        cdef enum OptixPrimitiveType:
+            OPTIX_PRIMITIVE_TYPE_CUSTOM,
+            OPTIX_PRIMITIVE_TYPE_ROUND_QUADRATIC_BSPLINE,
+            OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE,
+            OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR,
+            OPTIX_PRIMITIVE_TYPE_ROUND_CATMULLROM,
+            OPTIX_PRIMITIVE_TYPE_SPHERE,
+            OPTIX_PRIMITIVE_TYPE_TRIANGLE,
+    ELIF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 3:
         cdef enum OptixPrimitiveType:
             OPTIX_PRIMITIVE_TYPE_CUSTOM,
             OPTIX_PRIMITIVE_TYPE_ROUND_QUADRATIC_BSPLINE,
@@ -78,7 +87,15 @@ cdef extern from "optix.h" nogil:
             OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR,
             OPTIX_PRIMITIVE_TYPE_ROUND_CATMULLROM,
             OPTIX_PRIMITIVE_TYPE_TRIANGLE,
+    ELSE:
+        cdef enum OptixPrimitiveType:
+            OPTIX_PRIMITIVE_TYPE_CUSTOM,
+            OPTIX_PRIMITIVE_TYPE_ROUND_QUADRATIC_BSPLINE,
+            OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE,
+            OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR,
+            OPTIX_PRIMITIVE_TYPE_TRIANGLE,
 
+    IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 3:  # switch to new instance flags
         cdef enum OptixCurveEndcapFlags:
             OPTIX_CURVE_ENDCAP_DEFAULT,
             OPTIX_CURVE_ENDCAP_ON
@@ -99,13 +116,6 @@ cdef extern from "optix.h" nogil:
             unsigned int primitiveIndexOffset
             unsigned int endcapFlags
     ELSE:
-        cdef enum OptixPrimitiveType:
-            OPTIX_PRIMITIVE_TYPE_CUSTOM,
-            OPTIX_PRIMITIVE_TYPE_ROUND_QUADRATIC_BSPLINE,
-            OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE,
-            OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR,
-            OPTIX_PRIMITIVE_TYPE_TRIANGLE,
-
         cdef struct OptixBuildInputCurveArray:
             OptixPrimitiveType curveType
             unsigned int numPrimitives
@@ -139,10 +149,17 @@ cdef extern from "optix.h" nogil:
         OPTIX_TRANSFORM_FORMAT_NONE,
         OPTIX_TRANSFORM_FORMAT_MATRIX_FLOAT12,
 
-    cdef enum OptixGeometryFlags:
-        OPTIX_GEOMETRY_FLAG_NONE,
-        OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT,
-        OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL
+    IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 4:  # switch to new geometry flags
+        cdef enum OptixGeometryFlags:
+            OPTIX_GEOMETRY_FLAG_NONE,
+            OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT,
+            OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL
+            OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING
+    ELSE:
+        cdef enum OptixGeometryFlags:
+            OPTIX_GEOMETRY_FLAG_NONE,
+            OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT,
+            OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL
 
     cdef struct OptixBuildInputTriangleArray:
         const CUdeviceptr * vertexBuffers
@@ -162,13 +179,37 @@ cdef extern from "optix.h" nogil:
         unsigned int primitiveIndexOffset
         OptixTransformFormat transformFormat
 
-    cdef struct OptixBuildInput:
-        OptixBuildInputType type
-        # union
-        OptixBuildInputTriangleArray triangleArray
-        OptixBuildInputCurveArray curveArray
-        OptixBuildInputCustomPrimitiveArray customPrimitiveArray
-        OptixBuildInputInstanceArray instanceArray
+    IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 4:  # switch to new geometry flags
+        cdef struct OptixBuildInputSphereArray:
+            const CUdeviceptr* vertexBuffers
+            unsigned int vertexStrideInBytes
+            unsigned int numVertices
+            const CUdeviceptr *radiusBuffers
+            unsigned int radiusStrideInBytes
+            int singleRadius
+            const unsigned int *flags
+            unsigned int numSbtRecords
+            CUdeviceptr sbtIndexOffsetBuffer
+            unsigned int sbtIndexOffsetSizeInBytes
+            unsigned int sbtIndexOffsetStrideInBytes
+            unsigned int primitiveIndexOffset
+
+        cdef struct OptixBuildInput:
+            OptixBuildInputType type
+            # union
+            OptixBuildInputTriangleArray triangleArray
+            OptixBuildInputCurveArray curveArray
+            OptixBuildInputSphereArray   sphereArray
+            OptixBuildInputCustomPrimitiveArray customPrimitiveArray
+            OptixBuildInputInstanceArray instanceArray
+    ELSE:
+        cdef struct OptixBuildInput:
+            OptixBuildInputType type
+            # union
+            OptixBuildInputTriangleArray triangleArray
+            OptixBuildInputCurveArray curveArray
+            OptixBuildInputCustomPrimitiveArray customPrimitiveArray
+            OptixBuildInputInstanceArray instanceArray
 
     cdef struct OptixAccelBufferSizes:
         size_t outputSizeInBytes
@@ -300,6 +341,15 @@ cdef class BuildInputCurveArray(BuildInputArray):
     cdef vector[CUdeviceptr] _d_normal_buffer_ptrs
     cdef object _d_index_buffer
 
+IF _OPTIX_VERSION > 70400:
+    cdef class BuildInputSphereArray(BuildInputArray):
+        cdef OptixBuildInputSphereArray build_input
+        cdef list _d_vertex_buffers
+        cdef vector[CUdeviceptr] _d_vertex_buffer_ptrs
+        cdef list _d_radius_buffers
+        cdef vector[CUdeviceptr] _d_radius_buffer_ptrs
+        cdef object _d_sbt_offset_buffer
+        cdef vector[unsigned int] _flags
 
 cdef class Instance(OptixObject):
     cdef OptixInstance instance
