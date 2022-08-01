@@ -33,10 +33,12 @@ cdef extern from "optix.h" nogil:
         float timeBegin
         float timeEnd
 
+
     cdef struct OptixAccelBuildOptions:
         unsigned int buildFlags
         OptixBuildOperation operation
         OptixMotionOptions motionOptions
+
 
     cdef enum OptixBuildInputType:
         OPTIX_BUILD_INPUT_TYPE_TRIANGLES,
@@ -51,6 +53,7 @@ cdef extern from "optix.h" nogil:
         CUdeviceptr instances
         unsigned int numInstances
 
+
     cdef struct OptixAabb:
         float minX
         float minY
@@ -58,6 +61,7 @@ cdef extern from "optix.h" nogil:
         float maxX
         float maxY
         float maxZ
+
 
     cdef struct OptixBuildInputCustomPrimitiveArray:
         const CUdeviceptr * aabbBuffers
@@ -69,6 +73,7 @@ cdef extern from "optix.h" nogil:
         unsigned int sbtIndexOffsetSizeInBytes
         unsigned int sbtIndexOffsetStrideInBytes
         unsigned int primitiveIndexOffset
+
 
     IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 4:  # switch to new instance flags
         cdef enum OptixPrimitiveType:
@@ -95,10 +100,12 @@ cdef extern from "optix.h" nogil:
             OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR,
             OPTIX_PRIMITIVE_TYPE_TRIANGLE,
 
+
     IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 3:  # switch to new instance flags
         cdef enum OptixCurveEndcapFlags:
             OPTIX_CURVE_ENDCAP_DEFAULT,
             OPTIX_CURVE_ENDCAP_ON
+
 
         cdef struct OptixBuildInputCurveArray:
             OptixPrimitiveType curveType
@@ -131,10 +138,12 @@ cdef extern from "optix.h" nogil:
             unsigned int flag
             unsigned int primitiveIndexOffset
 
+
     cdef enum OptixIndicesFormat:
         OPTIX_INDICES_FORMAT_NONE,
         OPTIX_INDICES_FORMAT_UNSIGNED_SHORT3,
         OPTIX_INDICES_FORMAT_UNSIGNED_INT3
+
 
     cdef enum OptixVertexFormat:
         OPTIX_VERTEX_FORMAT_NONE,
@@ -145,11 +154,13 @@ cdef extern from "optix.h" nogil:
         OPTIX_VERTEX_FORMAT_SNORM16_3,
         OPTIX_VERTEX_FORMAT_SNORM16_2
 
+
     cdef enum OptixTransformFormat:
         OPTIX_TRANSFORM_FORMAT_NONE,
         OPTIX_TRANSFORM_FORMAT_MATRIX_FLOAT12,
 
-    IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 4:  # switch to new geometry flags
+
+    IF _OPTIX_VERSION > 70400:  # switch to new geometry flags
         cdef enum OptixGeometryFlags:
             OPTIX_GEOMETRY_FLAG_NONE,
             OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT,
@@ -179,7 +190,8 @@ cdef extern from "optix.h" nogil:
         unsigned int primitiveIndexOffset
         OptixTransformFormat transformFormat
 
-    IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 4:  # switch to new geometry flags
+
+    IF _OPTIX_VERSION > 70400:  # switch to new geometry flags
         cdef struct OptixBuildInputSphereArray:
             const CUdeviceptr* vertexBuffers
             unsigned int vertexStrideInBytes
@@ -211,23 +223,29 @@ cdef extern from "optix.h" nogil:
             OptixBuildInputCustomPrimitiveArray customPrimitiveArray
             OptixBuildInputInstanceArray instanceArray
 
+
     cdef struct OptixAccelBufferSizes:
         size_t outputSizeInBytes
         size_t tempSizeInBytes
         size_t tempUpdateSizeInBytes
 
+
     cdef enum OptixAccelPropertyType:
         OPTIX_PROPERTY_TYPE_COMPACTED_SIZE,
         OPTIX_PROPERTY_TYPE_AABBS,
+
 
     cdef struct OptixAccelEmitDesc:
         CUdeviceptr result
         OptixAccelPropertyType type
 
+
     ctypedef uintptr_t OptixTraversableHandle
+
 
     cdef struct OptixAccelRelocationInfo:
         unsigned long long info[4]
+
 
     cdef enum OptixTraversableType:
         OPTIX_TRAVERSABLE_TYPE_STATIC_TRANSFORM,
@@ -341,6 +359,7 @@ cdef class BuildInputCurveArray(BuildInputArray):
     cdef vector[CUdeviceptr] _d_normal_buffer_ptrs
     cdef object _d_index_buffer
 
+
 IF _OPTIX_VERSION > 70400:
     cdef class BuildInputSphereArray(BuildInputArray):
         cdef OptixBuildInputSphereArray build_input
@@ -350,6 +369,7 @@ IF _OPTIX_VERSION > 70400:
         cdef vector[CUdeviceptr] _d_radius_buffer_ptrs
         cdef object _d_sbt_offset_buffer
         cdef vector[unsigned int] _flags
+
 
 cdef class Instance(OptixObject):
     cdef OptixInstance instance

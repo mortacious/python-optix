@@ -46,8 +46,8 @@ cdef extern from "optix_includes.h" nogil:
             size_t    internalGuideLayerPixelSizeInBytes
 
         cdef enum OptixDenoiserAlphaMode:
-            OPTIX_DENOISER_ALPHA_MODE_COPY
-            OPTIX_DENOISER_ALPHA_MODE_ALPHA_AS_AOV
+            OPTIX_DENOISER_ALPHA_MODE_COPY,
+            OPTIX_DENOISER_ALPHA_MODE_ALPHA_AS_AOV,
             OPTIX_DENOISER_ALPHA_MODE_FULL_DENOISE_PASS
 
         cdef struct OptixDenoiserParams:
@@ -55,7 +55,7 @@ cdef extern from "optix_includes.h" nogil:
             CUdeviceptr  hdrIntensity
             float        blendFactor
             CUdeviceptr  hdrAverageColor
-            unsigned int    temporalModeUsePreviousLayers
+            unsigned int temporalModeUsePreviousLayers
     ELSE:
         cdef struct OptixDenoiserSizes:
             size_t stateSizeInBytes
@@ -68,8 +68,6 @@ cdef extern from "optix_includes.h" nogil:
             CUdeviceptr  hdrIntensity
             float        blendFactor
             CUdeviceptr  hdrAverageColor
-
-
 
 
     cdef enum OptixPixelFormat:
