@@ -38,7 +38,9 @@ def get_path(key):
         return tuple()
 
 
-def search_on_path(filenames, keys=('PATH',)):
+def search_on_path(filenames, keys=None):
+    if keys is None:
+        keys = ('PATH',)
     for p in chain(*[get_path(key) for key in keys]):
         for filename in filenames:
             full = os.path.abspath(os.path.join(p, filename))
@@ -47,7 +49,7 @@ def search_on_path(filenames, keys=('PATH',)):
     return None
 
 
-def get_cuda_path(environment_variable='CUDA_ROOT'):
+def get_cuda_path(environment_variable=None):
     global _cuda_path_cache
 
     # Use a magic word to represent the cache not filled because None is a
@@ -55,7 +57,8 @@ def get_cuda_path(environment_variable='CUDA_ROOT'):
     if _cuda_path_cache != 'NOT_INITIALIZED':
         return _cuda_path_cache
 
-    nvcc_path = search_on_path(('nvcc', 'nvcc.exe'), keys=(environment_variable, 'PATH'))
+    nvcc_path = search_on_path(('nvcc', 'nvcc.exe'), keys=(environment_variable, 'PATH') if environment_variable is not
+                                                                                            None else ('PATH',))
     cuda_path_default = None
     if nvcc_path is not None:
         cuda_path_default = os.path.normpath(
@@ -70,7 +73,7 @@ def get_cuda_path(environment_variable='CUDA_ROOT'):
     return _cuda_path_cache
 
 
-def get_cuda_include_path(environment_variable='CUDA_ROOT'):
+def get_cuda_include_path(environment_variable=None):
     cuda_path = get_cuda_path(environment_variable=environment_variable)
     if cuda_path is None:
         return None
@@ -81,7 +84,7 @@ def get_cuda_include_path(environment_variable='CUDA_ROOT'):
         return None
 
 
-def get_optix_path(environment_variable='OPTIX_PATH'):
+def get_optix_path(path_hint=None, environment_variable=None):
     global _optix_path_cache
 
     # Use a magic word to represent the cache not filled because None is a
@@ -89,14 +92,20 @@ def get_optix_path(environment_variable='OPTIX_PATH'):
     if _optix_path_cache != 'NOT_INITIALIZED':
         return _optix_path_cache
 
-    # prefer the dedicated environment variable
-    optix_header_path = search_on_path(('include/optix.h',), keys=(environment_variable,))
-    if optix_header_path is None:
-        # search on the default path
-        optix_header_path = search_on_path(('../optix/include/optix.h',), keys=('PATH',))
+    if path_hint is None:
+        # prefer the dedicated environment variable
+        optix_header_path = search_on_path(('include/optix.h',), keys=(environment_variable,) if environment_variable is not
+                                                                                                 None else None)
+        if optix_header_path is None:
+            # search on the default path
+            optix_header_path = search_on_path(('../optix/include/optix.h',), keys=('PATH',))
 
-    if optix_header_path is not None:
-        optix_header_path = os.path.normpath(os.path.join(os.path.dirname(optix_header_path), '..'))
+        if optix_header_path is not None:
+            optix_header_path = os.path.normpath(os.path.join(os.path.dirname(optix_header_path), '..'))
+    else:
+        optix_header_path = path_hint
+        if not os.path.exists(os.path.join(optix_header_path, "include/optix.h")):
+            raise ValueError(f"Path {optix_header_path} does not contain an optix installation.")
 
     if optix_header_path is not None:
         _optix_path_cache = optix_header_path
@@ -106,7 +115,7 @@ def get_optix_path(environment_variable='OPTIX_PATH'):
     return _optix_path_cache
 
 
-def get_optix_include_path(environment_variable='OPTIX_PATH'):
+def get_optix_include_path(environment_variable=None):
     optix_path = get_optix_path(environment_variable=environment_variable)
     if optix_path is None:
         return None

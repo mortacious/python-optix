@@ -217,6 +217,8 @@ cdef class Module(OptixContextObject):
     """
     Class representing a Optix Cuda program that will be called during pipeline execution. Wraps the OptixModule struct.
 
+    TODO: support creating modules through nvcc instead of nvrtc as well to support the new optix-ir format in 7.5
+
     Parameters
     ----------
     context: DeviceContext
@@ -406,6 +408,7 @@ cdef class Module(OptixContextObject):
         flags = list(compile_flags)
         # get cuda and optix_include_paths
         cuda_include_path = get_cuda_include_path()
+        print("cuda path", cuda_include_path)
         optix_include_path = get_optix_include_path()
 
         flags.extend([f'-I{cuda_include_path}', f'-I{optix_include_path}'])
