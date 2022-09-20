@@ -10,3 +10,4 @@ imgui.ini
 *.cpp
 *.c
 .*
+include/

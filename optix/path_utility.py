@@ -25,6 +25,7 @@
 
 import os
 from itertools import chain
+import pathlib
 
 _cuda_path_cache = 'NOT_INITIALIZED'
 _optix_path_cache = 'NOT_INITIALIZED'
@@ -98,7 +99,7 @@ def get_optix_path(path_hint=None, environment_variable=None):
                                                                                                  None else None)
         if optix_header_path is None:
             # search on the default path
-            optix_header_path = search_on_path(('../optix/include/optix.h',), keys=('PATH',))
+            optix_header_path = search_on_path(('../optix/include/optix.h',), keys=('PATH', 'OPTIX_PATH'))
 
         if optix_header_path is not None:
             optix_header_path = os.path.normpath(os.path.join(os.path.dirname(optix_header_path), '..'))
@@ -115,6 +116,10 @@ def get_optix_path(path_hint=None, environment_variable=None):
     return _optix_path_cache
 
 
+def get_local_optix_include_path():
+    local_include_path = pathlib.Path(__file__).parent / "include"
+    return str(local_include_path) if local_include_path.exists() else None
+
 def get_optix_include_path(environment_variable=None):
     optix_path = get_optix_path(environment_variable=environment_variable)
     if optix_path is None:
@@ -124,3 +129,4 @@ def get_optix_include_path(environment_variable=None):
         return optix_include_path
     else:
         return None
+
