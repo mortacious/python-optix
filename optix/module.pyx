@@ -2,7 +2,8 @@
 
 from enum import IntEnum, IntFlag
 import os
-from .path_utility import get_cuda_include_path, get_optix_include_path
+import warnings
+from .path_utility import get_cuda_include_path, get_optix_include_path, get_local_optix_include_path
 from .common cimport optix_check_return, optix_init
 from .context cimport DeviceContext
 from .pipeline cimport PipelineCompileOptions
@@ -408,9 +409,11 @@ cdef class Module(OptixContextObject):
         flags = list(compile_flags)
         # get cuda and optix_include_paths
         cuda_include_path = get_cuda_include_path()
-        print("cuda path", cuda_include_path)
-        optix_include_path = get_optix_include_path()
-
+        optix_include_path = get_local_optix_include_path()
+        if not os.path.exists(optix_include_path):
+            warnings.warn("Local optix not found. This usually indicates some installation issue. Attempting"
+                          " to load the global optix includes instead.", RuntimeWarning)
+            optix_include_path = get_optix_include_path()
         flags.extend([f'-I{cuda_include_path}', f'-I{optix_include_path}'])
         ptx, _ = prog.compile(flags)
         return ptx

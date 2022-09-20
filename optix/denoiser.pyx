@@ -319,7 +319,7 @@ cdef class Denoiser(OptixContextObject):
                 denoise_alpha = DenoiserAlphaMode.COPY
 
             assert isinstance(denoise_alpha, DenoiserAlphaMode), "Optix >7.5 changed this from a boolean variable into an enum"
-            params.denoiseAlpha = denoise_alpha.value
+            params.denoiseAlpha = <OptixDenoiserAlphaMode>denoise_alpha.value
         ELSE:
             params.denoiseAlpha = 1 if denoise_alpha else 0
 
