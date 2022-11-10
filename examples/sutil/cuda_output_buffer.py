@@ -119,8 +119,8 @@ class CudaOutputBuffer:
         self._reallocate_buffers()
 
     def resize(self, width, height):
-        self.width = width
-        self.height = height
+        self.width = int(width)
+        self.height = int(height)
 
     def get_host_buffer(self):
         if self.buffer_type is CudaOutputBufferType.CUDA_DEVICE:
