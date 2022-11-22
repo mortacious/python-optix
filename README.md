@@ -23,7 +23,13 @@ and the [OptiX 7.5.0 SDK](https://developer.nvidia.com/optix/downloads/7.5.0/lin
 
 Make sure the CUDA header files are installed as well.
 
-Add the locations of CUDA and OptiX to the system `PATH` variable if necessary.
+Add the location of CUDA to the system `PATH` variable if necessary.
+
+Due to restrictions in OptiX's license, it is not allowed to distribute the necessary headers 
+with this package in pypi. In order to enable the installation of this package in a virtual environment 
+without introducing a dependency to the main system, the optix headers will be copied into the 
+created wheel upon installation. 
+
 
 ### Using pip
 ```
@@ -34,5 +40,5 @@ pip install python-optix
 ```
 git clone https://github.com/mortacious/python-optix.git
 cd python-optix
-python setup.py install
+python -m pip install .
 ```
