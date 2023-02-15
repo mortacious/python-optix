@@ -17,6 +17,7 @@ __all__ = ['GeometryFlags',
            'BuildInputTriangleArray',
            'BuildInputCustomPrimitiveArray',
            'BuildInputCurveArray',
+           'BuildInputSphereArray',
            'BuildInputInstanceArray',
            'Instance',
            'AccelerationStructure',
@@ -31,9 +32,7 @@ class GeometryFlags(IntEnum):
     NONE = OPTIX_GEOMETRY_FLAG_NONE,
     DISABLE_ANYHIT = OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT,
     REQUIRE_SINGLE_ANYHIT_CALL = OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL
-
-    IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 4:
-        DISABLE_TRIANGLE_FACE_CULLING = OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING
+    DISABLE_TRIANGLE_FACE_CULLING = OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING
 
 
 class BuildFlags(IntFlag):
@@ -57,21 +56,14 @@ class PrimitiveType(IntEnum):
     ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_ROUND_QUADRATIC_BSPLINE,
     ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE,
     ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR
-
-    IF _OPTIX_VERSION > 70300:  # switch to new instance flags
-        ROUND_CATMULLROM = OPTIX_PRIMITIVE_TYPE_ROUND_CATMULLROM
-    IF _OPTIX_VERSION > 70400:  # switch to new instance flags
-        SPHERE = OPTIX_PRIMITIVE_TYPE_SPHERE
-
+    ROUND_CATMULLROM = OPTIX_PRIMITIVE_TYPE_ROUND_CATMULLROM
+    SPHERE = OPTIX_PRIMITIVE_TYPE_SPHERE
     TRIANGLE = OPTIX_PRIMITIVE_TYPE_TRIANGLE
 
 
 class CurveEndcapFlags(IntEnum):
-    IF _OPTIX_VERSION > 70300:  # switch to new instance flags
-        DEFAULT = OPTIX_CURVE_ENDCAP_DEFAULT,
-        ON = OPTIX_CURVE_ENDCAP_ON
-    ELSE:
-        DEFAULT = 0  # only for interface. Ignored for Optix versions below 7.4
+    DEFAULT = OPTIX_CURVE_ENDCAP_DEFAULT,
+    ON = OPTIX_CURVE_ENDCAP_ON
 
 
 class InstanceFlags(IntFlag):
@@ -417,8 +409,7 @@ cdef class BuildInputCurveArray(BuildInputArray):
 
         self.build_input.primitiveIndexOffset = primitive_index_offset
 
-        IF _OPTIX_VERSION > 70300:
-            self.build_input.endcapFlags = endcap_flags # only for Optix versions >= 7.4
+        self.build_input.endcapFlags = endcap_flags
 
     cdef void prepare_build_input(self, OptixBuildInput * build_input) except *:
         build_input.type = OPTIX_BUILD_INPUT_TYPE_CURVES
@@ -428,108 +419,106 @@ cdef class BuildInputCurveArray(BuildInputArray):
         return self.build_input.numPrimitives
 
 
-IF _OPTIX_VERSION > 70400:
-    cdef class BuildInputSphereArray(BuildInputArray):
+cdef class BuildInputSphereArray(BuildInputArray):
+    """
+        BuildInputArray for a sphere. This class wraps the OptixBuildInputSphereArray struct.
+        In Contrast to the behavior of the Optix C++ API, this Python class will automatically convert all numpy.ndarrays
+        to cupy.ndarrays and keep track of them.
+
+        Parameters
+        ----------
+        vertex_buffers:
+            List of vertex buffers (one for each motion step) or a single array.
+            All arrays will be converted to cupy.ndarrays before any further processing.
+        index_buffer: ndarray, optional
+            A single 2d array containing the indices of all triangles or None
+        num_sbt_records: int
+            The number of records in the ShaderBindingTable for this geometry
+        flags: GeometryFlags
+            Flags to use in this input for each motionstep
+        sbt_record_offset_buffer: ndarray, optional
+            Offsets into the ShaderBindingTable record for each primitive (index) or None
+        pre_transform: ndarray(3,4) or None
+            A transform to apply prior to processing
+        primitive_index_offset: int
+            The offset applied to the primitive index in device code
         """
-            BuildInputArray for a sphere. This class wraps the OptixBuildInputSphereArray struct.
-            In Contrast to the behavior of the Optix C++ API, this Python class will automatically convert all numpy.ndarrays
-            to cupy.ndarrays and keep track of them.
+    def __init__(self,
+                 vertex_buffers,
+                 radius_buffers,
+                 num_sbt_records = 1,
+                 flags = None,
+                 sbt_record_offset_buffer = None,
+                 pre_transform = None,
+                 primitive_index_offset = 0
+                 ):
 
-            Parameters
-            ----------
-            vertex_buffers:
-                List of vertex buffers (one for each motion step) or a single array.
-                All arrays will be converted to cupy.ndarrays before any further processing.
-            index_buffer: ndarray, optional
-                A single 2d array containing the indices of all triangles or None
-            num_sbt_records: int
-                The number of records in the ShaderBindingTable for this geometry
-            flags: GeometryFlags
-                Flags to use in this input for each motionstep
-            sbt_record_offset_buffer: ndarray, optional
-                Offsets into the ShaderBindingTable record for each primitive (index) or None
-            pre_transform: ndarray(3,4) or None
-                A transform to apply prior to processing
-            primitive_index_offset: int
-                The offset applied to the primitive index in device code
-            """
-        def __init__(self,
-                     vertex_buffers,
-                     radius_buffers,
-                     num_sbt_records = 1,
-                     flags = None,
-                     sbt_record_offset_buffer = None,
-                     pre_transform = None,
-                     primitive_index_offset = 0
-                     ):
+        self._d_vertex_buffers = [cp.asarray(vb) for vb in ensure_iterable(vertex_buffers)]
+        self._d_vertex_buffer_ptrs.reserve(len(self._d_vertex_buffers))
 
-            self._d_vertex_buffers = [cp.asarray(vb) for vb in ensure_iterable(vertex_buffers)]
-            self._d_vertex_buffer_ptrs.reserve(len(self._d_vertex_buffers))
+        self._d_radius_buffers = [cp.asarray(vb) for vb in ensure_iterable(radius_buffers)]
+        self._d_radius_buffer_ptrs.reserve(len(self._d_radius_buffers))
 
-            self._d_radius_buffers = [cp.asarray(vb) for vb in ensure_iterable(radius_buffers)]
-            self._d_radius_buffer_ptrs.reserve(len(self._d_radius_buffers))
+        if len(self._d_radius_buffers) != len(self._d_vertex_buffers):
+            raise ValueError("Argument radius_buffers must have the same number of arrays as vertex_buffers.")
 
-            if len(self._d_radius_buffers) != len(self._d_vertex_buffers):
-                raise ValueError("Argument radius_buffers must have the same number of arrays as vertex_buffers.")
+        if len(self._d_vertex_buffers) == 0:
+            raise ValueError("BuildInputSphereArray cannot be empty.")
 
-            if len(self._d_vertex_buffers) == 0:
-                raise ValueError("BuildInputSphereArray cannot be empty.")
+        dtype = self._d_vertex_buffers[0].dtype
+        shape = self._d_vertex_buffers[0].shape
+        strides = self._d_vertex_buffers[0].strides
 
-            dtype = self._d_vertex_buffers[0].dtype
-            shape = self._d_vertex_buffers[0].shape
-            strides = self._d_vertex_buffers[0].strides
+        radius_dtype = self._d_radius_buffers[0].dtype
+        radius_shape = self._d_radius_buffers[0].shape
+        strides = self._d_radius_buffers[0].strides
 
-            radius_dtype = self._d_radius_buffers[0].dtype
-            radius_shape = self._d_radius_buffers[0].shape
-            strides = self._d_radius_buffers[0].strides
+        for vb, rb in zip(self._d_vertex_buffers, self._d_radius_buffers):
+            if vb.dtype != dtype or vb.shape != shape or vb.strides != strides:
+                raise ValueError("All vertex buffers must have the same size and dtype.")
+            self._d_vertex_buffer_ptrs.push_back(vb.data.ptr)
 
-            for vb, rb in zip(self._d_vertex_buffers, self._d_radius_buffers):
-                if vb.dtype != dtype or vb.shape != shape or vb.strides != strides:
-                    raise ValueError("All vertex buffers must have the same size and dtype.")
-                self._d_vertex_buffer_ptrs.push_back(vb.data.ptr)
+            if rb.dtype != dtype or rb.shape != shape or rb.strides != strides:
+                raise ValueError("All radius buffers must have the same size and dtype.")
+            self._d_radius_buffer_ptrs.push_back(rb.data.ptr)
 
-                if rb.dtype != dtype or rb.shape != shape or rb.strides != strides:
-                    raise ValueError("All radius buffers must have the same size and dtype.")
-                self._d_radius_buffer_ptrs.push_back(rb.data.ptr)
+        self.build_input.vertexBuffers = self._d_vertex_buffer_ptrs.const_data()
+        self.build_input.radiusBuffers = self._d_radius_buffer_ptrs.const_data()
 
-            self.build_input.vertexBuffers = self._d_vertex_buffer_ptrs.const_data()
-            self.build_input.radiusBuffers = self._d_radius_buffer_ptrs.const_data()
+        self.build_input.vertexStrideInBytes = self._d_vertex_buffers[0].strides[0]
+        self.build_input.radiusStrideInBytes = self._d_radius_buffers[0].strides[0]
 
-            self.build_input.vertexStrideInBytes = self._d_vertex_buffers[0].strides[0]
-            self.build_input.radiusStrideInBytes = self._d_radius_buffers[0].strides[0]
+        self.build_input.numVertices = shape[0]
+        self.build_input.singleRadius = 1 if self._d_radius_buffers[0].shape[0] == 1 else 0
 
-            self.build_input.numVertices = shape[0]
-            self.build_input.singleRadius = 1 if self._d_radius_buffers[0].shape[0] == 1 else 0
+        self.build_input.numSbtRecords = num_sbt_records
+        self._flags.resize(num_sbt_records)
 
-            self.build_input.numSbtRecords = num_sbt_records
-            self._flags.resize(num_sbt_records)
+        if flags is None:
+            for i in range(num_sbt_records):
+                self._flags[i] = OPTIX_GEOMETRY_FLAG_NONE
+        else:
+            for i in range(num_sbt_records):
+                self._flags[i] = flags[i].value
 
-            if flags is None:
-                for i in range(num_sbt_records):
-                    self._flags[i] = OPTIX_GEOMETRY_FLAG_NONE
-            else:
-                for i in range(num_sbt_records):
-                    self._flags[i] = flags[i].value
-
-            self.build_input.flags = self._flags.data()
+        self.build_input.flags = self._flags.data()
 
 
-            if sbt_record_offset_buffer is not None:
-                self._d_sbt_offset_buffer = cp.asarray(sbt_record_offset_buffer).ravel()
-                self.build_input.sbtIndexOffsetBuffer = self._d_sbt_offset_buffer.data.ptr
-                itemsize = self._d_sbt_offset_buffer.itemsize
-                if itemsize > 4:
-                    raise ValueError("Only 32 bit allowed at max")
-                self.build_input.sbtIndexOffsetSizeInBytes = itemsize
-                self.build_input.sbtIndexOffsetStrideInBytes = self._d_sbt_offset_buffer.strides[0]
-            else:
-                self.build_input.sbtIndexOffsetBuffer = 0
-                self.build_input.sbtIndexOffsetStrideInBytes = 0
-                self.build_input.sbtIndexOffsetSizeInBytes = 0
+        if sbt_record_offset_buffer is not None:
+            self._d_sbt_offset_buffer = cp.asarray(sbt_record_offset_buffer).ravel()
+            self.build_input.sbtIndexOffsetBuffer = self._d_sbt_offset_buffer.data.ptr
+            itemsize = self._d_sbt_offset_buffer.itemsize
+            if itemsize > 4:
+                raise ValueError("Only 32 bit allowed at max")
+            self.build_input.sbtIndexOffsetSizeInBytes = itemsize
+            self.build_input.sbtIndexOffsetStrideInBytes = self._d_sbt_offset_buffer.strides[0]
+        else:
+            self.build_input.sbtIndexOffsetBuffer = 0
+            self.build_input.sbtIndexOffsetStrideInBytes = 0
+            self.build_input.sbtIndexOffsetSizeInBytes = 0
 
-            self.build_input.primitiveIndexOffset = primitive_index_offset
+        self.build_input.primitiveIndexOffset = primitive_index_offset
 
-    __all__.append('BuildInputSphereArray')
 
 cdef class Instance(OptixObject):
     """

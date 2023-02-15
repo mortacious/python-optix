@@ -6,68 +6,39 @@ from libc.stdint cimport uintptr_t
 from libcpp cimport bool
 
 cdef extern from "optix_includes.h" nogil:
-    IF _OPTIX_VERSION > 70400:
-        cdef enum OptixDenoiserModelKind:
-            OPTIX_DENOISER_MODEL_KIND_LDR
-            OPTIX_DENOISER_MODEL_KIND_HDR
-            OPTIX_DENOISER_MODEL_KIND_AOV
-            OPTIX_DENOISER_MODEL_KIND_TEMPORAL
-            OPTIX_DENOISER_MODEL_KIND_TEMPORAL_AOV
-            OPTIX_DENOISER_MODEL_KIND_UPSCALE2X
-            OPTIX_DENOISER_MODEL_KIND_TEMPORAL_UPSCALE2X
-
-    ELIF _OPTIX_VERSION > 70300:
-        cdef enum OptixDenoiserModelKind:
-            OPTIX_DENOISER_MODEL_KIND_LDR
-            OPTIX_DENOISER_MODEL_KIND_HDR
-            OPTIX_DENOISER_MODEL_KIND_AOV
-            OPTIX_DENOISER_MODEL_KIND_TEMPORAL
-            OPTIX_DENOISER_MODEL_KIND_TEMPORAL_AOV
-    ELSE:
-        cdef enum OptixDenoiserModelKind:
-            OPTIX_DENOISER_MODEL_KIND_LDR
-            OPTIX_DENOISER_MODEL_KIND_HDR
-            OPTIX_DENOISER_MODEL_KIND_AOV
-            OPTIX_DENOISER_MODEL_KIND_TEMPORAL
-
+    cdef enum OptixDenoiserModelKind:
+        OPTIX_DENOISER_MODEL_KIND_LDR
+        OPTIX_DENOISER_MODEL_KIND_HDR
+        OPTIX_DENOISER_MODEL_KIND_AOV
+        OPTIX_DENOISER_MODEL_KIND_TEMPORAL
+        OPTIX_DENOISER_MODEL_KIND_TEMPORAL_AOV
+        OPTIX_DENOISER_MODEL_KIND_UPSCALE2X
+        OPTIX_DENOISER_MODEL_KIND_TEMPORAL_UPSCALE2X
 
     cdef struct OptixDenoiserOptions:
         unsigned int guideAlbedo
         unsigned int guideNormal
 
-    IF _OPTIX_VERSION > 70400:
-        cdef struct OptixDenoiserSizes:
-            size_t stateSizeInBytes
-            size_t  withOverlapScratchSizeInBytes
-            size_t  withoutOverlapScratchSizeInBytes
-            unsigned int overlapWindowSizeInPixels
-            size_t    computeAverageColorSizeInBytes
-            size_t    computeIntensitySizeInBytes
-            size_t    internalGuideLayerPixelSizeInBytes
+    cdef struct OptixDenoiserSizes:
+        size_t stateSizeInBytes
+        size_t  withOverlapScratchSizeInBytes
+        size_t  withoutOverlapScratchSizeInBytes
+        unsigned int overlapWindowSizeInPixels
+        size_t    computeAverageColorSizeInBytes
+        size_t    computeIntensitySizeInBytes
+        size_t    internalGuideLayerPixelSizeInBytes
 
-        cdef enum OptixDenoiserAlphaMode:
-            OPTIX_DENOISER_ALPHA_MODE_COPY,
-            OPTIX_DENOISER_ALPHA_MODE_ALPHA_AS_AOV,
-            OPTIX_DENOISER_ALPHA_MODE_FULL_DENOISE_PASS
+    cdef enum OptixDenoiserAlphaMode:
+        OPTIX_DENOISER_ALPHA_MODE_COPY,
+        OPTIX_DENOISER_ALPHA_MODE_ALPHA_AS_AOV,
+        OPTIX_DENOISER_ALPHA_MODE_FULL_DENOISE_PASS
 
-        cdef struct OptixDenoiserParams:
-            OptixDenoiserAlphaMode denoiseAlpha
-            CUdeviceptr  hdrIntensity
-            float        blendFactor
-            CUdeviceptr  hdrAverageColor
-            unsigned int temporalModeUsePreviousLayers
-    ELSE:
-        cdef struct OptixDenoiserSizes:
-            size_t stateSizeInBytes
-            size_t  withOverlapScratchSizeInBytes
-            size_t  withoutOverlapScratchSizeInBytes
-            unsigned int overlapWindowSizeInPixels
-
-        cdef struct OptixDenoiserParams:
-            unsigned int denoiseAlpha
-            CUdeviceptr  hdrIntensity
-            float        blendFactor
-            CUdeviceptr  hdrAverageColor
+    cdef struct OptixDenoiserParams:
+        OptixDenoiserAlphaMode denoiseAlpha
+        CUdeviceptr  hdrIntensity
+        float        blendFactor
+        CUdeviceptr  hdrAverageColor
+        unsigned int temporalModeUsePreviousLayers
 
 
     cdef enum OptixPixelFormat:
@@ -93,18 +64,12 @@ cdef extern from "optix_includes.h" nogil:
         OptixImage2D previousOutput
         OptixImage2D output
 
-    IF _OPTIX_VERSION > 70400:
-        cdef struct OptixDenoiserGuideLayer:
-            OptixImage2D albedo
-            OptixImage2D normal
-            OptixImage2D flow
-            OptixImage2D previousOutputInternalGuideLayer
-            OptixImage2D outputInternalGuideLayer
-    ELSE:
-        cdef struct OptixDenoiserGuideLayer:
-            OptixImage2D albedo
-            OptixImage2D normal
-            OptixImage2D flow
+    cdef struct OptixDenoiserGuideLayer:
+        OptixImage2D albedo
+        OptixImage2D normal
+        OptixImage2D flow
+        OptixImage2D previousOutputInternalGuideLayer
+        OptixImage2D outputInternalGuideLayer
 
     ctypedef struct OptixDenoiser:
         pass
