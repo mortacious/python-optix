@@ -7,6 +7,8 @@ from libc.string cimport memset
 from enum import IntEnum
 optix_init()
 
+__all__ = ['ProgramGroup', 'ProgramGroupKind']
+
 class ProgramGroupKind(IntEnum):
     """
     Wraps the OptixProgramGroupKind enum

@@ -15,6 +15,9 @@ from libcpp.vector cimport vector
 
 optix_init()
 
+__all__ = ['Module', 'ModuleCompileOptions', 'CompileOptimizationLevel', 'CompileDebugLevel',
+           'PayloadSemantics', 'Task']
+
 class CompileOptimizationLevel(IntEnum):
     """
     Wraps the OptixCompileOptimizationLevel enum

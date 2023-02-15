@@ -4,9 +4,9 @@ from .common cimport optix_check_return, optix_init
 from libc.stdint cimport uintptr_t, int32_t
 import cupy as cp
 
-optix_init()
+__all__ = ['optix_version', 'DeviceContext']
 
-OPTIX_VERSION = _OPTIX_VERSION
+optix_init()
 
 def optix_version():
     return _OPTIX_VERSION_MAJOR, _OPTIX_VERSION_MINOR, _OPTIX_VERSION_MICRO

@@ -15,6 +15,9 @@ from .shader_binding_table cimport ShaderBindingTable
 
 optix_init()
 
+__all__ = ['CompileDebugLevel', 'ExceptionFlags', 'TraversableGraphFlags', 'PrimitiveTypeFlags',
+           'PipelineCompileOptions', 'PipelineLinkOptions', 'Pipeline']
+
 
 class ExceptionFlags(IntFlag):
     """
