@@ -5,7 +5,6 @@ import os
 from pathlib import Path
 import shutil
 
-
 OPTIX_COMPATIBLE_VERSION = (7, 6)
 
 # standalone import of a module (https://stackoverflow.com/a/58423785)

@@ -194,7 +194,7 @@ cdef extern from "optix.h" nogil:
     ctypedef uintptr_t OptixTraversableHandle
 
 
-    cdef struct OptixAccelRelocationInfo:
+    cdef struct OptixRelocationInfo:
         unsigned long long info[4]
 
 
@@ -210,6 +210,8 @@ cdef extern from "optix.h" nogil:
         OPTIX_INSTANCE_FLAG_FLIP_TRIANGLE_FACING
         OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT
         OPTIX_INSTANCE_FLAG_ENFORCE_ANYHIT
+        OPTIX_INSTANCE_FLAG_FORCE_OPACITY_MICROMAP_2_STATE
+        OPTIX_INSTANCE_FLAG_DISABLE_OPACITY_MICROMAPS
 
 
     cdef struct OptixInstance:
@@ -219,6 +221,27 @@ cdef extern from "optix.h" nogil:
         unsigned int visibilityMask
         unsigned int flags
         OptixTraversableHandle traversableHandle
+
+
+    cdef struct OptixRelocateInputInstanceArray:
+        unsigned int numInstances
+        CUdeviceptr traversableHandles
+
+
+    cdef struct OptixRelocateInputOpacityMicromap:
+        CUdeviceptr opacityMicromapArray
+
+
+    cdef struct OptixRelocateInputTriangleArray:
+        unsigned int numSbtRecords
+        OptixRelocateInputOpacityMicromap opacityMicromap
+
+
+    cdef struct OptixRelocateInput:
+        OptixBuildInputType type
+        OptixRelocateInputInstanceArray instanceArray
+        OptixRelocateInputTriangleArray triangleArray
+
 
     OptixResult optixAccelComputeMemoryUsage(OptixDeviceContext context,
                                  const OptixAccelBuildOptions * accelOptions,
@@ -252,22 +275,22 @@ cdef extern from "optix.h" nogil:
 
     OptixResult optixAccelRelocate(OptixDeviceContext context,
                        CUstream stream,
-                       const OptixAccelRelocationInfo * info,
-                       CUdeviceptr instanceTraversableHandles,
-                       size_t numInstanceTraversableHandles,
+                       const OptixRelocationInfo * info,
+                       const OptixRelocateInput * relocateInputs,
+                       size_t numRelocateInputs,
                        CUdeviceptr targetAccel,
                        size_t targetAccelSizeInBytes,
                        OptixTraversableHandle * targetHandle
                        )
 
-    OptixResult optixAccelCheckRelocationCompatibility(OptixDeviceContext context,
-                                           const OptixAccelRelocationInfo * info,
+    OptixResult optixCheckRelocationCompatibility(OptixDeviceContext context,
+                                           const OptixRelocationInfo * info,
                                            int * compatible
                                            )
 
     OptixResult optixAccelGetRelocationInfo(OptixDeviceContext context,
                                 OptixTraversableHandle handle,
-                                OptixAccelRelocationInfo * info
+                                OptixRelocationInfo * info
                                 )
 
     OptixResult optixConvertPointerToTraversableHandle(OptixDeviceContext onDevice,
