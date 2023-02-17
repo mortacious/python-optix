@@ -4,6 +4,7 @@ import re
 import os
 from pathlib import Path
 import shutil
+import numpy
 
 OPTIX_COMPATIBLE_VERSION = (7, 6)
 
@@ -63,9 +64,9 @@ if os.name == 'nt':
     libraries.append('advapi32')
 
 extensions = [Extension("*", ["optix/*.pyx"],
-                        include_dirs=[cuda_include_path, optix_include_path], libraries=libraries)]
+                        include_dirs=[cuda_include_path, optix_include_path, numpy.get_include()], libraries=libraries)]
 extensions = cythonize(extensions, language_level="3",
-                        compile_time_env=cython_compile_env, build_dir="build")
+                        compile_time_env=cython_compile_env, build_dir="build", annotate=True)
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()

@@ -23,11 +23,6 @@ __all__ = ['GeometryFlags',
            'Instance',
            'AccelerationStructure',
            'CurveEndcapFlags',
-           'OpacityMicromapArrayIndexingMode',
-           'OpacityMicromapFlags',
-           'OpacityMicromapFormat',
-           'OpacityMicromapState',
-           'OpacityMicromapHistogramEntrys'
            ]
 
 
@@ -937,9 +932,11 @@ cdef class AccelerationStructure(OptixContextObject):
         if device is None:
             device = self.context
 
+        cdef DeviceContext _device = device
+
         # check if the new device is compatible with this acceleration structure
         cdef int compatible = 0
-        optix_check_return(optixCheckRelocationCompatibility(device.c_context,
+        optix_check_return(optixCheckRelocationCompatibility(<OptixDeviceContext>_device.c_context,
                                                                   &gas_info,
                                                                   &compatible))
         if compatible != 1:
@@ -949,7 +946,7 @@ cdef class AccelerationStructure(OptixContextObject):
         cls = self.__class__
         cdef AccelerationStructure result = cls.__new__(cls)
 
-        result.context = device
+        result.context = _device
         result._build_flags = self._build_flags
         result._buffer_sizes = self._buffer_sizes
         result._instances = deepcopy(self._instances) # copy all instances and their AccelerationStructures first

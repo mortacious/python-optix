@@ -41,8 +41,6 @@ cdef extern from "optix_includes.h" nogil:
         OPTIX_COMPILE_DEBUG_LEVEL_FULL
 
 
-
-
     cdef struct OptixPipelineCompileOptions:
         int usesMotionBlur
         unsigned int traversableGraphFlags
@@ -51,6 +49,7 @@ cdef extern from "optix_includes.h" nogil:
         unsigned int exceptionFlags
         const char * pipelineLaunchParamsVariableName
         unsigned int usesPrimitiveTypeFlags
+        int allowOpacityMicromaps
 
 
     cdef struct OptixPipelineLinkOptions:
