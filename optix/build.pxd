@@ -2,7 +2,8 @@ from .common cimport OptixResult, CUstream, CUdeviceptr
 from .context cimport OptixDeviceContext, OptixContextObject
 from libcpp.vector cimport vector
 from .base cimport OptixObject
-from libc.stdint cimport uintptr_t
+from libc.stdint cimport uintptr_t, uint32_t
+from .micromap cimport OptixBuildInputOpacityMicromap
 
 
 cdef extern from "optix.h" nogil:
@@ -133,6 +134,7 @@ cdef extern from "optix.h" nogil:
         OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL
         OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING
 
+
     cdef struct OptixBuildInputTriangleArray:
         const CUdeviceptr * vertexBuffers
         unsigned int numVertices
@@ -150,6 +152,8 @@ cdef extern from "optix.h" nogil:
         unsigned int sbtIndexOffsetStrideInBytes
         unsigned int primitiveIndexOffset
         OptixTransformFormat transformFormat
+        OptixBuildInputOpacityMicromap opacityMicromap
+
 
     cdef struct OptixBuildInputSphereArray:
         const CUdeviceptr* vertexBuffers
@@ -164,6 +168,7 @@ cdef extern from "optix.h" nogil:
         unsigned int sbtIndexOffsetSizeInBytes
         unsigned int sbtIndexOffsetStrideInBytes
         unsigned int primitiveIndexOffset
+
 
     cdef struct OptixBuildInput:
         OptixBuildInputType type
@@ -265,6 +270,7 @@ cdef extern from "optix.h" nogil:
                     unsigned int numEmittedProperties
                     )
 
+
     OptixResult optixAccelCompact(OptixDeviceContext context,
                                   CUstream stream,
                                   OptixTraversableHandle inputHandle,
@@ -272,6 +278,7 @@ cdef extern from "optix.h" nogil:
                                   size_t outputBufferSizeInBytes,
                                   OptixTraversableHandle * outputHandle
                                   )
+
 
     OptixResult optixAccelRelocate(OptixDeviceContext context,
                        CUstream stream,
@@ -283,21 +290,25 @@ cdef extern from "optix.h" nogil:
                        OptixTraversableHandle * targetHandle
                        )
 
+
     OptixResult optixCheckRelocationCompatibility(OptixDeviceContext context,
                                            const OptixRelocationInfo * info,
                                            int * compatible
                                            )
+
 
     OptixResult optixAccelGetRelocationInfo(OptixDeviceContext context,
                                 OptixTraversableHandle handle,
                                 OptixRelocationInfo * info
                                 )
 
+
     OptixResult optixConvertPointerToTraversableHandle(OptixDeviceContext onDevice,
                                            CUdeviceptr pointer,
                                            OptixTraversableType traversableType,
                                            OptixTraversableHandle * traversableHandle
                                            )
+
 
 cdef class BuildInputArray(OptixObject):
     cdef void prepare_build_input(self, OptixBuildInput* build_input) except *

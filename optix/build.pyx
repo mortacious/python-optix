@@ -8,6 +8,7 @@ from enum import IntEnum, IntFlag
 from libc.string cimport memcpy, memset
 from libcpp.vector cimport vector
 from .common import round_up, ensure_iterable
+import typing as typ
 
 optix_init()
 
@@ -21,7 +22,12 @@ __all__ = ['GeometryFlags',
            'BuildInputInstanceArray',
            'Instance',
            'AccelerationStructure',
-           'CurveEndcapFlags'
+           'CurveEndcapFlags',
+           'OpacityMicromapArrayIndexingMode',
+           'OpacityMicromapFlags',
+           'OpacityMicromapFormat',
+           'OpacityMicromapState',
+           'OpacityMicromapHistogramEntrys'
            ]
 
 
@@ -77,6 +83,7 @@ class InstanceFlags(IntFlag):
     ENFORCE_ANYHIT = OPTIX_INSTANCE_FLAG_ENFORCE_ANYHIT,
     FORCE_OPACITY_MICROMAP_2_STATE = OPTIX_INSTANCE_FLAG_FORCE_OPACITY_MICROMAP_2_STATE,
     DISABLE_OPACITY_MICROMAPS = OPTIX_INSTANCE_FLAG_DISABLE_OPACITY_MICROMAPS
+
 
 cdef class BuildInputArray(OptixObject):
     """
@@ -895,28 +902,44 @@ cdef class AccelerationStructure(OptixContextObject):
 
     def __deepcopy__(self, memodict={}):
         """
-        Perform a deep copy of the AccelerationStructure by using the standard python copy.deepcopy function. This method
-        will also handle any necessary relocation tasks required by optiX on a copy.
+        Perform a deep copy of the AccelerationStructure by using the standard python copy.deepcopy function.
+        """
+        # relocate on the same device to perform a regular deep copy
+        result = self.relocate(device=None)
+        memodict[id(self)] = result
+        return result
+
+
+    def relocate(self, device: typ.Optional[DeviceContext] = None):
+        """
+        Relocate this acceleration structure into another copy. Usually this is equivalent to a deep copy.
+        Additionally, the accleration structure can be copied to a different defice by specifying the device
+        parameter with a different DeviceContext.
 
         Parameters
         ----------
-        memodict
-
+        device:
+            An optional DeviceContext. The resulting copy of the acceleration structure will be copied
+            to this device. If None, the acceleration structure's current device is used.
         Returns
         -------
         copy: AccelerationStructure
-            The copy of the AccelerationStructure
+            The copy of the AccelerationStructure on the new device
 
         """
         from copy import deepcopy
         # relocate the optix structure
-        cdef OptixAccelRelocationInfo gas_info
-        memset(&gas_info, 0, sizeof(OptixAccelRelocationInfo)) # init struct to 0
+        cdef OptixRelocationInfo gas_info
+        memset(&gas_info, 0, sizeof(OptixRelocationInfo)) # init struct to 0
 
         optix_check_return(optixAccelGetRelocationInfo(self.context.c_context, self._handle, &gas_info))
 
+        if device is None:
+            device = self.context
+
+        # check if the new device is compatible with this acceleration structure
         cdef int compatible = 0
-        optix_check_return(optixAccelCheckRelocationCompatibility(self.context.c_context,
+        optix_check_return(optixCheckRelocationCompatibility(device.c_context,
                                                                   &gas_info,
                                                                   &compatible))
         if compatible != 1:
@@ -926,9 +949,7 @@ cdef class AccelerationStructure(OptixContextObject):
         cls = self.__class__
         cdef AccelerationStructure result = cls.__new__(cls)
 
-        memodict[id(self)] = result
-
-        result.context = self.context
+        result.context = device
         result._build_flags = self._build_flags
         result._buffer_sizes = self._buffer_sizes
         result._instances = deepcopy(self._instances) # copy all instances and their AccelerationStructures first
@@ -942,16 +963,26 @@ cdef class AccelerationStructure(OptixContextObject):
         cdef object d_instances
         cdef size_t i
         cdef CUdeviceptr d_instances_ptr = 0
+        cdef vector[OptixRelocateInput] c_relocate_inputs
+        cdef size_t num_relocate_inputs
 
         if result._instances is not None:
+            c_relocate_inputs.resize(1)
+            c_relocate_inputs[0].type = OPTIX_BUILD_INPUT_TYPE_INSTANCES
+            c_relocate_inputs[0].instanceArray.numInstances = len(result._instances)
+
             # prepare the new instance handles for relocation
-            c_instance_handles.resize(len(result._instances))
+            c_instance_handles.resize(c_relocate_inputs[0].instanceArray.numInstances)
             c_instance_handles_size = sizeof(OptixTraversableHandle) * c_instance_handles.size()
             d_instances = cp.cuda.alloc(c_instance_handles_size)
             for i in range(c_instance_handles.size()):
                 c_instance_handles[i] = result._instances[i].traversable.handle
             d_instances_ptr = d_instances.ptr
             cp.cuda.runtime.memcpy(d_instances_ptr, <size_t>c_instance_handles.data(), c_instance_handles_size, cp.cuda.runtime.memcpyHostToDevice)
+            c_relocate_inputs[0].instanceArray.traversableHandles = d_instances_ptr
+
+        # TODO: handle micromaps here
+        #if result._micromaps is not None:
 
         result._handle = 0
 
@@ -960,8 +991,8 @@ cdef class AccelerationStructure(OptixContextObject):
         optix_check_return(optixAccelRelocate(result.context.c_context,
                                               <CUstream>c_stream,
                                               &gas_info,
-                                              d_instances_ptr,
-                                              c_instance_handles_size,
+                                              &c_relocate_inputs[0],
+                                              c_relocate_inputs.size(),
                                               result._gas_buffer,
                                               self._buffer_sizes.outputSizeInBytes,
                                               &c_handle))
