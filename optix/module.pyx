@@ -384,28 +384,53 @@ cdef class Module(OptixContextObject):
 
     @staticmethod
     def compile_cuda_ptx(src, compile_flags=_nvrtc_compile_flags_default, name=None, **kwargs):
-        if os.path.exists(src):
-            name = src
+        """
+        Compiles a valid source module into the ptx format. Accepts files containing either source code, ptx, or
+        optix-ir code, compiles the source code if necessary and returns valid ptx or optix-ir modules.
+
+        Parameters
+        ----------
+        src: A string containing either the file name of the module to be compiled or the CUDA source code directly.
+        compile_flags: The flags used for the call to the nvptx compiler. If src is compiled already, this is ignored.
+        name: The name of the compiled module. If src is not an inline string, this is ignored and the file name is used
+        kwargs: Additional kwargs passed to the NVRTC compiler. See the _NVRTCProgram in the cupy package for details.
+
+        Returns
+        -------
+        ptx: A compiled ptx string or a string in optix-ir format.
+        """
+        compiled = False
+        if os.path.isfile(src):
+            # if src is a file
+            name, ext = os.path.splitext(src)
+            if ext == '.ptx' or ext == '.optixir':
+                # if the file points to a compiled module (either in ptx or in optixir format) just return it's contents
+                compiled = True
+            # read the file contents
             with open(src, 'r') as f:
                 src = f.read()
-        if _is_ptx(src):
-            return src
+        elif _is_ptx(src):
+            # if the source is in ptx format already (e.g. as an inline string) just return it
+            compiled = True
 
-        elif name is None:
+        if name is None:
             name = "default_program"
 
-        # TODO is there a public API for that?
-        from cupy.cuda.compiler import _NVRTCProgram as NVRTCProgram
-        prog = NVRTCProgram(src, name, **kwargs)
-        flags = list(compile_flags)
-        # get cuda and optix_include_paths
-        cuda_include_path = get_cuda_include_path()
-        optix_include_path = get_local_optix_include_path()
-        if not os.path.exists(optix_include_path):
-            warnings.warn("Local optix not found. This usually indicates some installation issue. Attempting"
-                          " to load the global optix includes instead.", RuntimeWarning)
-            optix_include_path = get_optix_include_path()
-        flags.extend([f'-I{cuda_include_path}', f'-I{optix_include_path}'])
-        ptx, _ = prog.compile(flags)
-        return ptx
+        if not compiled:
+            # TODO is there a public API for that?
+            from cupy.cuda.compiler import _NVRTCProgram as NVRTCProgram
+            prog = NVRTCProgram(src, name, **kwargs)
+            flags = list(compile_flags)
+            # get cuda and optix_include_paths
+            cuda_include_path = get_cuda_include_path()
+            optix_include_path = get_local_optix_include_path()
+            if not os.path.exists(optix_include_path):
+                warnings.warn("Local optix not found. This usually indicates some installation issue. Attempting"
+                              " to load the global optix includes instead.", RuntimeWarning)
+                optix_include_path = get_optix_include_path()
+            flags.extend([f'-I{cuda_include_path}', f'-I{optix_include_path}'])
+            ptx, _ = prog.compile(flags)
+            return ptx
+        else:
+            return src
 
