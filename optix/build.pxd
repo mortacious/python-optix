@@ -3,7 +3,7 @@ from .context cimport OptixDeviceContext, OptixContextObject
 from libcpp.vector cimport vector
 from .base cimport OptixObject
 from libc.stdint cimport uintptr_t, uint32_t
-from .micromap cimport OptixBuildInputOpacityMicromap
+from .micromap cimport OptixBuildInputOpacityMicromap, BuildInputOpacityMicromap
 
 
 cdef extern from "optix.h" nogil:
@@ -15,6 +15,8 @@ cdef extern from "optix.h" nogil:
         OPTIX_BUILD_FLAG_PREFER_FAST_BUILD,
         OPTIX_BUILD_FLAG_ALLOW_RANDOM_VERTEX_ACCESS,
         OPTIX_BUILD_FLAG_ALLOW_RANDOM_INSTANCE_ACCESS,
+        OPTIX_BUILD_FLAG_ALLOW_OPACITY_MICROMAP_UPDATE,
+        OPTIX_BUILD_FLAG_ALLOW_DISABLE_OPACITY_MICROMAPS
 
 
     cdef enum OptixBuildOperation:
@@ -46,7 +48,8 @@ cdef extern from "optix.h" nogil:
         OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES,
         OPTIX_BUILD_INPUT_TYPE_INSTANCES,
         OPTIX_BUILD_INPUT_TYPE_INSTANCE_POINTERS,
-        OPTIX_BUILD_INPUT_TYPE_CURVES
+        OPTIX_BUILD_INPUT_TYPE_CURVES,
+        OPTIX_BUILD_INPUT_TYPE_SPHERES
 
 
     cdef struct OptixBuildInputInstanceArray:
@@ -311,6 +314,7 @@ cdef extern from "optix.h" nogil:
 
 
 cdef class BuildInputArray(OptixObject):
+    cdef OptixBuildInputType build_input_type
     cdef void prepare_build_input(self, OptixBuildInput* build_input) except *
     cdef size_t num_elements(self)
 
@@ -323,6 +327,7 @@ cdef class BuildInputTriangleArray(BuildInputArray):
     cdef object _d_sbt_offset_buffer
     cdef object _d_pre_transform
     cdef vector[unsigned int] _flags
+    cdef BuildInputOpacityMicromap _micromap
 
 
 cdef class BuildInputCustomPrimitiveArray(BuildInputArray):
@@ -373,6 +378,8 @@ cdef class AccelerationStructure(OptixContextObject):
     cdef OptixAccelBufferSizes _buffer_sizes
     cdef object _instances
     cdef OptixTraversableHandle _handle
+    cdef list _relocate_deps
+
     cdef void _init_build_inputs(self, build_inputs, vector[OptixBuildInput]& ret)
     cdef void _init_accel_options(self, size_t num_build_inputs, unsigned int build_flags, OptixBuildOperation operation, vector[OptixAccelBuildOptions]& ret)
     cdef void build(self, build_inputs, stream=*)

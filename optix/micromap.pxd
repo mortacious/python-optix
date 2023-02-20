@@ -1,4 +1,6 @@
 from libc.stdint cimport uint32_t
+from libcpp.vector cimport vector
+from libcpp.pair cimport pair
 from .base cimport OptixObject
 from .common cimport OptixResult, CUstream, CUdeviceptr
 from .context cimport OptixDeviceContext, OptixContextObject
@@ -60,6 +62,12 @@ cdef extern from "optix.h" nogil:
     cdef const unsigned char OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE_DEFINE "OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE"  # = 3
 
     cdef const unsigned long long OPTIX_OPACITY_MICROMAP_ARRAY_BUFFER_BYTE_ALIGNMENT "OPTIX_OPACITY_MICROMAP_ARRAY_BUFFER_BYTE_ALIGNMENT"
+
+    cdef const int OPTIX_OPACITY_MICROMAP_PREDEFINED_INDEX_FULLY_TRANSPARENT_DEFINE "OPTIX_OPACITY_MICROMAP_PREDEFINED_INDEX_FULLY_TRANSPARENT"  # = 3
+    cdef const int OPTIX_OPACITY_MICROMAP_PREDEFINED_INDEX_FULLY_OPAQUE_DEFINE "OPTIX_OPACITY_MICROMAP_PREDEFINED_INDEX_FULLY_OPAQUE"  # = 3
+    cdef const int OPTIX_OPACITY_MICROMAP_PREDEFINED_INDEX_FULLY_UNKNOWN_TRANSPARENT_DEFINE "OPTIX_OPACITY_MICROMAP_PREDEFINED_INDEX_FULLY_UNKNOWN_TRANSPARENT"  # = 3
+    cdef const int OPTIX_OPACITY_MICROMAP_PREDEFINED_INDEX_FULLY_UNKNOWN_OPAQUE_DEFINE "OPTIX_OPACITY_MICROMAP_PREDEFINED_INDEX_FULLY_UNKNOWN_OPAQUE"  # = 3
+
 
 
     cdef struct OptixOpacityMicromapArrayBuildInput:
@@ -143,9 +151,18 @@ cdef class OpacityMicromapInput(OptixObject):
 
 
 cdef class OpacityMicromapArray(OptixContextObject):
-    cdef object _d_micromap_array_buffer
+    cdef object d_micromap_array_buffer
     cdef OptixOpacityMicromapFlags _build_flags
     cdef size_t _buffer_size
+    cdef tuple _micromap_types
 
     cdef void build(self, inputs, stream=*)
+
+
+cdef class BuildInputOpacityMicromap(OptixObject):
+    cdef OptixBuildInputOpacityMicromap build_input
+    cdef OpacityMicromapArray micromap_array
+    cdef object _d_index_buffer
+    cdef object _usage_counts
+    cdef vector[OptixOpacityMicromapUsageCount] c_usage_counts
 
