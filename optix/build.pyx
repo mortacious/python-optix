@@ -895,17 +895,19 @@ cdef class AccelerationStructure(OptixContextObject):
                                                NULL,
                                                0))
 
-    def __deepcopy__(self, memodict={}):
+    def __deepcopy__(self, memo):
         """
         Perform a deep copy of the AccelerationStructure by using the standard python copy.deepcopy function.
         """
         # relocate on the same device to perform a regular deep copy
         result = self.relocate(device=None)
-        memodict[id(self)] = result
+        memo[id(self)] = result
         return result
 
 
-    def relocate(self, device: typ.Optional[DeviceContext] = None):
+    def relocate(self,
+                 device: typ.Optional[DeviceContext] = None,
+                 stream: typ.Optional[cp.cuda.Stream] = None):
         """
         Relocate this acceleration structure into another copy. Usually this is equivalent to a deep copy.
         Additionally, the accleration structure can be copied to a different defice by specifying the device
@@ -916,6 +918,8 @@ cdef class AccelerationStructure(OptixContextObject):
         device:
             An optional DeviceContext. The resulting copy of the acceleration structure will be copied
             to this device. If None, the acceleration structure's current device is used.
+        stream:
+            The stream to use for the relocation. If None, the default stream (0) is used.
         Returns
         -------
         copy: AccelerationStructure
@@ -982,6 +986,9 @@ cdef class AccelerationStructure(OptixContextObject):
         result._handle = 0
 
         cdef uintptr_t c_stream = 0
+        if stream is not None:
+            c_stream = stream.ptr
+
         cdef OptixTraversableHandle c_handle = 0
         optix_check_return(optixAccelRelocate(result.context.c_context,
                                               <CUstream>c_stream,
