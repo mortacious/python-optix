@@ -177,7 +177,7 @@ cdef class ModuleCompileOptions(OptixObject):
         self.compile_options.debugLevel = level.value
 
 
-cdef tuple _nvrtc_compile_flags_default = ('-use_fast_math', '-lineinfo', '-default-device', '-std=c++11', '-rdc', 'true')
+cdef tuple _nvrtc_compile_flags_default = ('-use_fast_math', '-default-device', '-std=c++11', '-rdc', 'true')
 
 def get_default_nvrtc_compile_flags(std=None, rdc=False):
     flags = list(_nvrtc_compile_flags_default[:-3])
@@ -249,10 +249,10 @@ cdef class Module(OptixContextObject):
 
         if module_compile_options.debug_level != CompileDebugLevel.NONE:
             self._compile_flags.append("-G")
+            self._compile_flags.append("-lineinfo")
         if src is not None:
             ptx = self.compile_cuda_ptx(src, compile_flags, name=program_name)
             c_ptx = ptx
-
             optix_check_return(optixModuleCreateFromPTX(self.context.c_context,
                                      &module_compile_options.compile_options,
                                      &pipeline_compile_options.compile_options,
@@ -261,7 +261,6 @@ cdef class Module(OptixContextObject):
                                      NULL,
                                      NULL,
                                      &self.module))
-
     def __dealloc__(self):
         if <uintptr_t> self.module != 0:
             optix_check_return(optixModuleDestroy(self.module))

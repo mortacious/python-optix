@@ -101,7 +101,6 @@ def bake_opacity_micromap(uint8_t[:, :] opacity, format = None):
 
     # create the array to bake the opacities into
     opacity_baked = np.zeros((opacity.shape[0], opacity.shape[1] // 16 * bits_per_state), dtype=np.uint16)
-
     cdef unsigned int bake_stride = 16 // bits_per_state
 
     cdef uint16_t[:, :] opacity_baked_view = opacity_baked
@@ -282,6 +281,7 @@ cdef class OpacityMicromapArray(OptixContextObject):
         cdef size_t inputs_size_in_bytes = 0
         micromap_counts = defaultdict(lambda: 0)
         micromap_types = []
+
         self.c_num_micromaps = 0
         # build the histogram from the input specifications and convert it into a cpp vector to pass it to the build input
         for i in inputs:
@@ -307,14 +307,15 @@ cdef class OpacityMicromapArray(OptixContextObject):
         # allocate a buffer to hold all input micromaps and put it's pointer in the build input
         d_input_buffer = cp.cuda.alloc(inputs_size_in_bytes)
         build_input.inputBuffer = d_input_buffer.ptr
-        self._buffer_size = inputs_size_in_bytes
 
         cdef unsigned int offset = 0
         cdef vector[OptixOpacityMicromapDesc] descs
         cdef uint16_t[:, :] buffer_view
+        cdef unsigned int t
+        cdef unsigned int desc_i = 0;
 
-        descs.resize(len(inputs))
-
+        descs.resize(self.c_num_micromaps)
+        #TODO use the actual triangles in the input array here!
         # copy all input data into the device buffer
         for i, inp in enumerate(inputs):
             buffer_view = (<OpacityMicromapInput>inp).buffer
@@ -323,17 +324,18 @@ cdef class OpacityMicromapArray(OptixContextObject):
                                    <uintptr_t>&buffer_view[0,0],
                                    <size_t>num_bytes,
                                    cp.cuda.runtime.memcpyHostToDevice)
-            # fill the descriptor array at the same time with to information in input
-            descs[i].byteOffset = offset
-            descs[i].subdivisionLevel = <unsigned short>inp.subdivision_level
-            descs[i].format = <unsigned short>inp.format.value
-
-            offset += num_bytes
+            for t in range(inp.ntriangles):
+                # fill the descriptor array at the same time with to information in input
+                descs[desc_i].byteOffset = offset
+                offset += buffer_view.shape[1] * sizeof(uint16_t)
+                descs[desc_i].subdivisionLevel = <unsigned short>inp.subdivision_level
+                descs[desc_i].format = <unsigned short>inp.format.value
+                desc_i += 1
 
         # copy the descriptor array onto the device
         cdef size_t desc_size_in_bytes = descs.size() * sizeof(OptixOpacityMicromapDesc)
-        d_desc_buffer = cp.cuda.alloc(desc_size_in_bytes)
 
+        d_desc_buffer = cp.cuda.alloc(desc_size_in_bytes)
         cp.cuda.runtime.memcpy(d_desc_buffer.ptr, <uintptr_t>descs.data(), desc_size_in_bytes, cp.cuda.runtime.memcpyHostToDevice)
 
         build_input.perMicromapDescBuffer = d_desc_buffer.ptr
@@ -344,9 +346,10 @@ cdef class OpacityMicromapArray(OptixContextObject):
         optix_check_return(optixOpacityMicromapArrayComputeMemoryUsage(self.context.c_context,
                                                                        &build_input,
                                                                        &build_sizes))
-
         # TODO: do we have to align this buffer?
         self.d_micromap_array_buffer = cp.cuda.alloc(build_sizes.outputSizeInBytes)
+        self._buffer_size = build_sizes.outputSizeInBytes
+
         d_temp_buffer = cp.cuda.alloc(build_sizes.tempSizeInBytes)
 
         cdef OptixMicromapBuffers micromap_buffers

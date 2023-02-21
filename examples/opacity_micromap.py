@@ -197,13 +197,12 @@ def create_acceleration_structure(ctx, vertices, omm):
     triangle_input = ox.BuildInputTriangleArray(vertices,
                                                 flags=[ox.GeometryFlags.NONE],
                                                 opacity_micromap=omm_build_input)
-    print("triangle input", triangle_input)
     gas = ox.AccelerationStructure(ctx, triangle_input, compact=True)
     return gas
 
 
 def create_module(ctx, pipeline_opts):
-    compile_opts = ox.ModuleCompileOptions(debug_level=ox.CompileDebugLevel.FULL, opt_level=ox.CompileOptimizationLevel.LEVEL_0)
+    compile_opts = ox.ModuleCompileOptions(debug_level=ox.CompileDebugLevel.NONE, opt_level=ox.CompileOptimizationLevel.LEVEL_3)
     module = ox.Module(ctx, cuda_src, compile_opts, pipeline_opts)
     return module
 
@@ -219,13 +218,12 @@ def create_program_groups(ctx, module):
 
 def create_pipeline(ctx, program_grps, pipeline_options):
     link_opts = ox.PipelineLinkOptions(max_trace_depth=1,
-                                       debug_level=ox.CompileDebugLevel.FULL)
+                                       debug_level=ox.CompileDebugLevel.NONE)
 
     pipeline = ox.Pipeline(ctx,
                            compile_options=pipeline_options,
                            link_options=link_opts,
                            program_groups=program_grps)
-
     pipeline.compute_stack_sizes(1,  # max_trace_depth
                                  0,  # max_cc_depth
                                  0)  # max_dc_depth
@@ -251,17 +249,14 @@ def create_sbt(program_grps):
 def launch_pipeline(pipeline: ox.Pipeline, sbt, params):
     img_size = (params.image_width[0], params.image_height[0])
     output_image = np.zeros(img_size + (4, ), 'B')
-    #output_image[:, :, :] = [255, 128, 0, 255]
     output_image = cp.asarray(output_image)
 
     params.image = output_image.data.ptr
 
     stream = cp.cuda.Stream()
-
     pipeline.launch(sbt, dimensions=img_size, params=params.handle, stream=stream)
 
     stream.synchronize()
-
     return cp.asnumpy(output_image)
 
 
@@ -279,7 +274,6 @@ if __name__ == "__main__":
     init_camera(params)
 
     opacity_micromap = create_opacity_micromap(ctx)
-    print("omm", opacity_micromap)
     gas = create_acceleration_structure(ctx, vertices, opacity_micromap)
     params.trav_handle = gas.handle
 
