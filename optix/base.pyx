@@ -9,4 +9,4 @@ cdef class OptixObject:
         return ""
 
     def __repr__(self):
-        return f"<optix.{self.__class__.__name__}({self._repr_details()})>"
+        return f"optix.{self.__class__.__name__}({self._repr_details()})"

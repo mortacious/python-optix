@@ -9,7 +9,7 @@ from .common cimport optix_check_return, optix_init
 
 cimport cython
 from cython.operator import dereference
-from libc.stdint cimport uint8_t, uint32_t, uintptr_t
+from libc.stdint cimport uint8_t, uint16_t, uint32_t, uintptr_t
 from libcpp cimport bool
 from libcpp.vector cimport vector
 from libc.string cimport memset
@@ -26,7 +26,9 @@ __all__ = ['micromap_indices_to_base_barycentrics',
            'OpacityMicromapFormat',
            'OpacityMicromapState',
            'OpacityMicromapInput',
-           'OpacityMicromapArray']
+           'OpacityMicromapArray',
+           'OpacityMicromapArrayIndexingMode',
+           'BuildInputOpacityMicromap']
 
 
 cdef bool valid_subdivision_level(uint8_t[:, :] opacity):
@@ -98,11 +100,11 @@ def bake_opacity_micromap(uint8_t[:, :] opacity, format = None):
         bits_per_state = OpacityMicromapFormat(format).value
 
     # create the array to bake the opacities into
-    opacity_baked = np.zeros((opacity.shape[0], opacity.shape[1] // 8 * bits_per_state), dtype=np.uint8)
+    opacity_baked = np.zeros((opacity.shape[0], opacity.shape[1] // 16 * bits_per_state), dtype=np.uint16)
 
-    cdef unsigned int bake_stride = 8 // bits_per_state
+    cdef unsigned int bake_stride = 16 // bits_per_state
 
-    cdef uint8_t[:, :] opacity_baked_view = opacity_baked
+    cdef uint16_t[:, :] opacity_baked_view = opacity_baked
     cdef unsigned int baked_index
     cdef unsigned int i, j
     with nogil:
@@ -184,12 +186,8 @@ cdef class OpacityMicromapInput(OptixObject):
             for unbaked inputs.
     """
     def __init__(self,
-                 uint8_t[:, :] opacity,
+                 opacity,
                  format: typ.Optional[OpacityMicromapFormat] = None):
-        """
-
-
-        """
         buffer = np.atleast_2d(opacity)
 
         format = OpacityMicromapFormat(format) if format is not None else None
@@ -223,10 +221,15 @@ cdef class OpacityMicromapInput(OptixObject):
         return self.c_subdivision_level
 
     @property
+    def ntriangles(self):
+        return self.buffer.shape[0]
+
+    @property
     def nbytes(self):
         return self.buffer.size * self.buffer.itemsize
 
-
+    def _repr_details(self):
+        return f"ntriangles={self.ntriangles}, format={self.format.name}, subdivision_level={self.subdivision_level}"
 # ctypedef pair[OptixOpacityMicromapFormat, int] histogram_entry
 #
 # cdef bint histogram_entry_hash(const histogram_entry& s) nogil:
@@ -279,12 +282,14 @@ cdef class OpacityMicromapArray(OptixContextObject):
         cdef size_t inputs_size_in_bytes = 0
         micromap_counts = defaultdict(lambda: 0)
         micromap_types = []
+        self.c_num_micromaps = 0
         # build the histogram from the input specifications and convert it into a cpp vector to pass it to the build input
         for i in inputs:
             omm_type = OpacityMicromapType(i.format, i.subdivision_level)
-            micromap_counts[omm_type] += 1
+            micromap_counts[omm_type] += i.ntriangles
             micromap_types.append(omm_type)
             inputs_size_in_bytes += i.nbytes
+            self.c_num_micromaps += i.ntriangles
         self._micromap_types = tuple(micromap_types)
 
         cdef vector[OptixOpacityMicromapHistogramEntry] histogram_entries
@@ -302,20 +307,21 @@ cdef class OpacityMicromapArray(OptixContextObject):
         # allocate a buffer to hold all input micromaps and put it's pointer in the build input
         d_input_buffer = cp.cuda.alloc(inputs_size_in_bytes)
         build_input.inputBuffer = d_input_buffer.ptr
+        self._buffer_size = inputs_size_in_bytes
 
         cdef unsigned int offset = 0
         cdef vector[OptixOpacityMicromapDesc] descs
-        cdef uint8_t[:, :] buffer_view
+        cdef uint16_t[:, :] buffer_view
 
         descs.resize(len(inputs))
 
         # copy all input data into the device buffer
         for i, inp in enumerate(inputs):
-            buffer_view = inp.buffer
+            buffer_view = (<OpacityMicromapInput>inp).buffer
             num_bytes = inp.nbytes
             cp.cuda.runtime.memcpy(d_input_buffer.ptr + offset,
-                                   &buffer_view[0,0],
-                                   num_bytes,
+                                   <uintptr_t>&buffer_view[0,0],
+                                   <size_t>num_bytes,
                                    cp.cuda.runtime.memcpyHostToDevice)
             # fill the descriptor array at the same time with to information in input
             descs[i].byteOffset = offset
@@ -327,6 +333,7 @@ cdef class OpacityMicromapArray(OptixContextObject):
         # copy the descriptor array onto the device
         cdef size_t desc_size_in_bytes = descs.size() * sizeof(OptixOpacityMicromapDesc)
         d_desc_buffer = cp.cuda.alloc(desc_size_in_bytes)
+
         cp.cuda.runtime.memcpy(d_desc_buffer.ptr, <uintptr_t>descs.data(), desc_size_in_bytes, cp.cuda.runtime.memcpyHostToDevice)
 
         build_input.perMicromapDescBuffer = d_desc_buffer.ptr
@@ -373,6 +380,9 @@ cdef class OpacityMicromapArray(OptixContextObject):
         result = self.relocate(device=None)
         memo[id(self)] = result
         return result
+
+    def _repr_details(self):
+        return f"size={self._buffer_size}, nmicromaps={self.c_num_micromaps}"
 
     def relocate(self,
                  device: typ.Optional[DeviceContext] = None,
@@ -463,7 +473,7 @@ cdef class BuildInputOpacityMicromap(OptixObject):
         for each triangle in the geometry is required.
     """
     def __init__(self,
-                 OpacityMicromapArray omm_array: OpacityMicromapArray,
+                 OpacityMicromapArray omm_array,
                  usage_counts: Sequence[int],
                  indexing_mode: OpacityMicromapArrayIndexingMode = OpacityMicromapArrayIndexingMode.NONE,
                  index_buffer = None):
@@ -487,22 +497,22 @@ cdef class BuildInputOpacityMicromap(OptixObject):
             self.build_input.indexStrideInBytes = 0
 
         self.build_input.indexingMode = <OptixOpacityMicromapArrayIndexingMode>indexing_mode.value
-        self.micromap_array = omm_array
-        self.build_input.opacityMicromapArray = self.micromap_array.d_micromap_array_buffer.ptr
+        self.c_micromap_array = omm_array
+        self.build_input.opacityMicromapArray = self.c_micromap_array.d_micromap_array_buffer.ptr
 
         # fill the usage counts vector from the specified usage array
         # TODO: is there a way to determine the usage count automatically?
-        micromap_types = self.micromap_array.types
+        micromap_types = self.c_micromap_array.types
         if len(usage_counts) != len(micromap_types):
             raise IndexError(f"Number of entries in usage_count must be equal to the number of omms in micromap_array. "
                              f"Expected {len(micromap_types)}), got ({len(usage_counts)})")
         usage_count_hist = defaultdict(lambda: 0)
 
-        for type, usage_counts in zip(micromap_types, usage_counts):
-            usage_count_hist[type] += usage_counts
+        for type, usage_count in zip(micromap_types, usage_counts):
+            usage_count_hist[type] += usage_count
+
         self._usage_counts = usage_count_hist
         self.c_usage_counts.resize(len(usage_counts))
-
         for i, (k, v) in enumerate(usage_count_hist.items()):
             self.c_usage_counts[i].count = v
             self.c_usage_counts[i].format = <OptixOpacityMicromapFormat>k.format.value
@@ -517,7 +527,11 @@ cdef class BuildInputOpacityMicromap(OptixObject):
 
     @property
     def types(self):
-        return self.micromap_array.types
+        return self.c_micromap_array.types
+
+    @property
+    def micromap_array(self):
+        return self.c_micromap_array
 
     @property
     def index_buffer(self):

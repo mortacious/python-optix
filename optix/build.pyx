@@ -9,8 +9,7 @@ from libc.string cimport memcpy, memset
 from libcpp.vector cimport vector
 from .common import round_up, ensure_iterable
 import typing as typ
-from dataclasses import dataclass
-from .micromap cimport BuildInputOpacityMicromap, OptixRelocateInputOpacityMicromap, OpacityMicromapArray
+from .micromap cimport BuildInputOpacityMicromap, OpacityMicromapArray
 
 optix_init()
 
@@ -141,7 +140,7 @@ cdef class BuildInputTriangleArray(BuildInputArray):
                  sbt_record_offset_buffer = None,
                  pre_transform = None,
                  primitive_index_offset = 0,
-                 micromap: typ.Optional[BuildInputOpacityMicromap] = None):
+                 opacity_micromap: typ.Optional[BuildInputOpacityMicromap] = None):
         super().__init__(BuildInputType.TRIANGLES)
         self._d_vertex_buffers = [cp.asarray(vb) for vb in ensure_iterable(vertex_buffers)]
         self._d_vertex_buffer_ptrs.reserve(len(self._d_vertex_buffers))
@@ -214,9 +213,9 @@ cdef class BuildInputTriangleArray(BuildInputArray):
             self.build_input.preTransform = 0
             self.build_input.transformFormat = OPTIX_TRANSFORM_FORMAT_NONE
 
-        self._micromap = micromap
-        if self._micromap is not None:
-            self.build_input.opacityMicromap = self._micromap.build_input
+        self.c_opacity_micromap = opacity_micromap
+        if self.c_opacity_micromap is not None:
+            self.build_input.opacityMicromap = self.c_opacity_micromap.build_input
 
 
     def __dealloc__(self):
@@ -259,12 +258,17 @@ cdef class BuildInputTriangleArray(BuildInputArray):
 
     @property
     def micromap(self):
-        return self._micromap
+        return self.c_opacity_micromap
 
     @property
     def num_sbt_records(self):
         return self.build_input.numSbtRecords
 
+
+    def _repr_details(self):
+        return f"nvertices={self.num_elements()}, " \
+               f"ntriangles={self._d_index_buffer.shape[0] if self._d_index_buffer is not None else self.num_elements() // 3}, " \
+               f"n_sbt_records={self.build_input.numSbtRecords}"
 
 cdef class BuildInputCustomPrimitiveArray(BuildInputArray):
     """
@@ -923,7 +927,9 @@ cdef class AccelerationStructure(OptixContextObject):
                 if inputs_size > 1:
                     raise ValueError("Only a single build input allowed for instance builds")
             elif isinstance(build_input, BuildInputTriangleArray):
-                relocation_dep = RelocationTriangleDependency(build_input.num_sbt_records, micromap=build_input.micromap)
+                micromap = <BuildInputTriangleArray>build_input.micromap
+                micromap_array = micromap.micromap_array if micromap is not None else None
+                relocation_dep = RelocationTriangleDependency(build_input.num_sbt_records, micromap=micromap_array)
             else:
                 relocation_dep = RelocationDependency(build_input.type)
             self._relocate_deps.append(relocation_dep)

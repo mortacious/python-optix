@@ -147,13 +147,14 @@ cdef extern from "optix.h" nogil:
 cdef class OpacityMicromapInput(OptixObject):
     cdef object buffer
     cdef OptixOpacityMicromapFormat c_format
-    cdef unsigned int subdivision_level
+    cdef unsigned int c_subdivision_level
 
 
 cdef class OpacityMicromapArray(OptixContextObject):
     cdef object d_micromap_array_buffer
     cdef OptixOpacityMicromapFlags _build_flags
     cdef size_t _buffer_size
+    cdef unsigned int c_num_micromaps
     cdef tuple _micromap_types
 
     cdef void build(self, inputs, stream=*)
@@ -161,7 +162,7 @@ cdef class OpacityMicromapArray(OptixContextObject):
 
 cdef class BuildInputOpacityMicromap(OptixObject):
     cdef OptixBuildInputOpacityMicromap build_input
-    cdef OpacityMicromapArray micromap_array
+    cdef OpacityMicromapArray c_micromap_array
     cdef object _d_index_buffer
     cdef object _usage_counts
     cdef vector[OptixOpacityMicromapUsageCount] c_usage_counts

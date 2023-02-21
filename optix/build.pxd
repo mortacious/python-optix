@@ -327,7 +327,7 @@ cdef class BuildInputTriangleArray(BuildInputArray):
     cdef object _d_sbt_offset_buffer
     cdef object _d_pre_transform
     cdef vector[unsigned int] _flags
-    cdef BuildInputOpacityMicromap _micromap
+    cdef BuildInputOpacityMicromap c_opacity_micromap
 
 
 cdef class BuildInputCustomPrimitiveArray(BuildInputArray):

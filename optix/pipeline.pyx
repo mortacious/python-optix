@@ -77,7 +77,8 @@ cdef class PipelineCompileOptions(OptixObject):
                  num_attribute_values = 0,
                  exception_flags = ExceptionFlags.NONE,
                  pipeline_launch_params_variable_name = "params",
-                 uses_primitive_type_flags = PrimitiveTypeFlags.DEFAULT):
+                 uses_primitive_type_flags = PrimitiveTypeFlags.DEFAULT,
+                 allow_opacity_micromaps=False):
         self.uses_motion_blur = uses_motion_blur
         self.traversable_graph_flags = traversable_graph_flags
         self.num_payload_values = num_payload_values
@@ -85,6 +86,7 @@ cdef class PipelineCompileOptions(OptixObject):
         self.exception_flags = exception_flags
         self.pipeline_launch_params_variable_name = pipeline_launch_params_variable_name
         self.uses_primitive_type_flags = uses_primitive_type_flags
+        self.allow_opacity_micromaps = allow_opacity_micromaps
 
     @property
     def uses_motion_blur(self):
@@ -144,6 +146,14 @@ cdef class PipelineCompileOptions(OptixObject):
     @uses_primitive_type_flags.setter
     def uses_primitive_type_flags(self, flags):
         self.compile_options.usesPrimitiveTypeFlags = flags.value
+
+    @property
+    def allow_opacity_micromaps(self):
+        return self.compile_options.allowOpacityMicromaps
+
+    @allow_opacity_micromaps.setter
+    def allow_opacity_micromaps(self, allow):
+        self.compile_options.allowOpacityMicromaps = allow
 
     @property
     def c_obj(self):
