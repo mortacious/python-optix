@@ -8,20 +8,20 @@ import numpy as np
 from enum import IntEnum
 from libcpp.vector cimport vector
 from .common import ensure_iterable
+from typing import Optional
 
 optix_init()
 
 __all__ = ['DenoiserModelKind',
-           'Denoiser'
+           'Denoiser',
+           'DenoiserAlphaMode'
            ]
 
-IF _OPTIX_VERSION > 70400:
-    class DenoiserAlphaMode(enum.IntEnum):
-        COPY = OPTIX_DENOISER_ALPHA_MODE_COPY
-        ALPHA_AS_AOV = OPTIX_DENOISER_ALPHA_MODE_ALPHA_AS_AOV
-        FULL_DENOISE_PASS = OPTIX_DENOISER_ALPHA_MODE_FULL_DENOISE_PASS
+class DenoiserAlphaMode(enum.IntEnum):
+    COPY = OPTIX_DENOISER_ALPHA_MODE_COPY
+    ALPHA_AS_AOV = OPTIX_DENOISER_ALPHA_MODE_ALPHA_AS_AOV
+    FULL_DENOISE_PASS = OPTIX_DENOISER_ALPHA_MODE_FULL_DENOISE_PASS
 
-    __all__.append('DenoiserAlphaMode')
 
 class DenoiserModelKind(IntEnum):
     """
@@ -31,20 +31,14 @@ class DenoiserModelKind(IntEnum):
     HDR = OPTIX_DENOISER_MODEL_KIND_HDR
     AOV = OPTIX_DENOISER_MODEL_KIND_AOV
     TEMPORAL = OPTIX_DENOISER_MODEL_KIND_TEMPORAL
-
-    IF _OPTIX_VERSION > 70300:
-        TEMPORAL_AOV = OPTIX_DENOISER_MODEL_KIND_TEMPORAL_AOV
-    IF _OPTIX_VERSION > 70400:
-        UPSCALE2X = OPTIX_DENOISER_MODEL_KIND_UPSCALE2X
-        TEMPORAL_UPSCALE2X = OPTIX_DENOISER_MODEL_KIND_TEMPORAL_UPSCALE2X
+    TEMPORAL_AOV = OPTIX_DENOISER_MODEL_KIND_TEMPORAL_AOV
+    UPSCALE2X = OPTIX_DENOISER_MODEL_KIND_UPSCALE2X
+    TEMPORAL_UPSCALE2X = OPTIX_DENOISER_MODEL_KIND_TEMPORAL_UPSCALE2X
 
     def temporal_mode(self):
-        IF _OPTIX_VERSION > 70400:
-            return self == self.TEMPORAL or self==self.TEMPORAL_AOV or self == self.TEMPORAL_UPSCALE2X
-        ELIF _OPTIX_VERSION > 70300:
-            return self == self.TEMPORAL or self == self.TEMPORAL_AOV
-        ELSE:
-            return self == self.TEMPORAL
+        return self == self.TEMPORAL or \
+               self==self.TEMPORAL_AOV or \
+               self == self.TEMPORAL_UPSCALE2X
 
 
 class PixelFormat(IntEnum):
@@ -54,8 +48,6 @@ class PixelFormat(IntEnum):
     FLOAT2 = OPTIX_PIXEL_FORMAT_FLOAT2
     FLOAT3 = OPTIX_PIXEL_FORMAT_FLOAT3
     FLOAT4 = OPTIX_PIXEL_FORMAT_FLOAT4
-
-
 
     @classmethod
     def from_dtype_size(cls, dtype, size):
@@ -205,12 +197,8 @@ cdef class Denoiser(OptixContextObject):
             self._state_size = return_sizes.stateSizeInBytes
             self._d_state = cp.cuda.alloc(return_sizes.stateSizeInBytes)
 
-        IF _OPTIX_VERSION > 70400:
-            self._intensity_scratch_size = return_sizes.computeIntensitySizeInBytes
-            self._average_color_scratch_size = return_sizes.computeAverageColorSizeInBytes
-        ELSE:
-            self._intensity_scratch_size = self._scratch_size
-            self._average_color_scratch_size = self._scratch_size
+        self._intensity_scratch_size = return_sizes.computeIntensitySizeInBytes
+        self._average_color_scratch_size = return_sizes.computeAverageColorSizeInBytes
 
         cdef uintptr_t c_stream = 0
 
@@ -226,8 +214,6 @@ cdef class Denoiser(OptixContextObject):
             self._state_size,
             self._d_scratch.ptr,
             self._scratch_size))
-
-
 
     @classmethod
     def create_with_user_model(cls, DeviceContext context, unsigned char[::1] user_model not None):
@@ -245,7 +231,7 @@ cdef class Denoiser(OptixContextObject):
                normals=None,
                flow=None,
                outputs=None,
-               denoise_alpha=None,
+               denoise_alpha: DenoiserAlphaMode = DenoiserAlphaMode.COPY,
                blend_factor=0.0,
                stream=None,
                temporal_use_previous_layer=False):
@@ -313,16 +299,8 @@ cdef class Denoiser(OptixContextObject):
         params.hdrAverageColor = <CUdeviceptr>self._d_avg_color.ptr if self._d_avg_color is not None else 0
         params.blendFactor = blend_factor
 
-        IF _OPTIX_VERSION > 70400:
-            params.temporalModeUsePreviousLayers = 1 if temporal_use_previous_layer and temporal_mode else 0
-            if denoise_alpha is None:
-                denoise_alpha = DenoiserAlphaMode.COPY
-
-            assert isinstance(denoise_alpha, DenoiserAlphaMode), "Optix >7.5 changed this from a boolean variable into an enum"
-            params.denoiseAlpha = <OptixDenoiserAlphaMode>denoise_alpha.value
-        ELSE:
-            params.denoiseAlpha = 1 if denoise_alpha else 0
-
+        params.temporalModeUsePreviousLayers = 1 if temporal_use_previous_layer and temporal_mode else 0
+        params.denoiseAlpha = <OptixDenoiserAlphaMode>denoise_alpha.value
 
         cdef uintptr_t c_stream = 0
 

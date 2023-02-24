@@ -10,6 +10,8 @@ from collections.abc import Mapping
 
 optix_init()
 
+__all__ = ['SbtRecord', 'LaunchParamsRecord']
+
 def  _aligned_itemsize( formats, alignment ):
     names = []
     for i in range( len(formats ) ):

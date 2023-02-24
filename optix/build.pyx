@@ -8,6 +8,8 @@ from enum import IntEnum, IntFlag
 from libc.string cimport memcpy, memset
 from libcpp.vector cimport vector
 from .common import round_up, ensure_iterable
+import typing as typ
+from .micromap cimport BuildInputOpacityMicromap, OpacityMicromapArray
 
 optix_init()
 
@@ -17,10 +19,11 @@ __all__ = ['GeometryFlags',
            'BuildInputTriangleArray',
            'BuildInputCustomPrimitiveArray',
            'BuildInputCurveArray',
+           'BuildInputSphereArray',
            'BuildInputInstanceArray',
            'Instance',
            'AccelerationStructure',
-           'CurveEndcapFlags'
+           'CurveEndcapFlags',
            ]
 
 
@@ -31,9 +34,7 @@ class GeometryFlags(IntEnum):
     NONE = OPTIX_GEOMETRY_FLAG_NONE,
     DISABLE_ANYHIT = OPTIX_GEOMETRY_FLAG_DISABLE_ANYHIT,
     REQUIRE_SINGLE_ANYHIT_CALL = OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL
-
-    IF _OPTIX_VERSION_MAJOR == 7 and _OPTIX_VERSION_MINOR > 4:
-        DISABLE_TRIANGLE_FACE_CULLING = OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING
+    DISABLE_TRIANGLE_FACE_CULLING = OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING
 
 
 class BuildFlags(IntFlag):
@@ -57,21 +58,14 @@ class PrimitiveType(IntEnum):
     ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_ROUND_QUADRATIC_BSPLINE,
     ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE,
     ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR
-
-    IF _OPTIX_VERSION > 70300:  # switch to new instance flags
-        ROUND_CATMULLROM = OPTIX_PRIMITIVE_TYPE_ROUND_CATMULLROM
-    IF _OPTIX_VERSION > 70400:  # switch to new instance flags
-        SPHERE = OPTIX_PRIMITIVE_TYPE_SPHERE
-
+    ROUND_CATMULLROM = OPTIX_PRIMITIVE_TYPE_ROUND_CATMULLROM
+    SPHERE = OPTIX_PRIMITIVE_TYPE_SPHERE
     TRIANGLE = OPTIX_PRIMITIVE_TYPE_TRIANGLE
 
 
 class CurveEndcapFlags(IntEnum):
-    IF _OPTIX_VERSION > 70300:  # switch to new instance flags
-        DEFAULT = OPTIX_CURVE_ENDCAP_DEFAULT,
-        ON = OPTIX_CURVE_ENDCAP_ON
-    ELSE:
-        DEFAULT = 0  # only for interface. Ignored for Optix versions below 7.4
+    DEFAULT = OPTIX_CURVE_ENDCAP_DEFAULT,
+    ON = OPTIX_CURVE_ENDCAP_ON
 
 
 class InstanceFlags(IntFlag):
@@ -83,17 +77,35 @@ class InstanceFlags(IntFlag):
     FLIP_TRIANGLE_FACING = OPTIX_INSTANCE_FLAG_FLIP_TRIANGLE_FACING,
     DISABLE_ANYHIT = OPTIX_INSTANCE_FLAG_DISABLE_ANYHIT,
     ENFORCE_ANYHIT = OPTIX_INSTANCE_FLAG_ENFORCE_ANYHIT,
+    FORCE_OPACITY_MICROMAP_2_STATE = OPTIX_INSTANCE_FLAG_FORCE_OPACITY_MICROMAP_2_STATE,
+    DISABLE_OPACITY_MICROMAPS = OPTIX_INSTANCE_FLAG_DISABLE_OPACITY_MICROMAPS
+
+
+class BuildInputType(IntEnum):
+    TRIANGLES = OPTIX_BUILD_INPUT_TYPE_TRIANGLES,
+    CUSTOM_PRIMITIVES = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES,
+    INSTANCES = OPTIX_BUILD_INPUT_TYPE_INSTANCES,
+    INSTANCE_POINTERS = OPTIX_BUILD_INPUT_TYPE_INSTANCE_POINTERS,
+    CURVES = OPTIX_BUILD_INPUT_TYPE_CURVES,
+    SPHERES = OPTIX_BUILD_INPUT_TYPE_SPHERES
 
 
 cdef class BuildInputArray(OptixObject):
     """
     Base class for all BuildInput Arrays. This is an internal class.
     """
+    def __init__(self, type):
+        self.build_input_type = <OptixBuildInputType><int>(BuildInputType(type).value)
+
     cdef void prepare_build_input(self, OptixBuildInput* build_input) except *:
         pass
 
     cdef size_t num_elements(self):
         return 0
+
+    @property
+    def type(self):
+        return BuildInputType(self.build_input_type)
 
 
 cdef class BuildInputTriangleArray(BuildInputArray):
@@ -127,9 +139,9 @@ cdef class BuildInputTriangleArray(BuildInputArray):
                  flags = None,
                  sbt_record_offset_buffer = None,
                  pre_transform = None,
-                 primitive_index_offset = 0
-                 ):
-
+                 primitive_index_offset = 0,
+                 opacity_micromap: typ.Optional[BuildInputOpacityMicromap] = None):
+        super().__init__(BuildInputType.TRIANGLES)
         self._d_vertex_buffers = [cp.asarray(vb) for vb in ensure_iterable(vertex_buffers)]
         self._d_vertex_buffer_ptrs.reserve(len(self._d_vertex_buffers))
 
@@ -163,6 +175,7 @@ cdef class BuildInputTriangleArray(BuildInputArray):
             self.build_input.indexStrideInBytes = 0
             self.build_input.numIndexTriplets = 0
             self.build_input.indexBuffer = 0
+            self._d_index_buffer = None
 
         self.build_input.numSbtRecords = num_sbt_records
 
@@ -200,11 +213,16 @@ cdef class BuildInputTriangleArray(BuildInputArray):
             self.build_input.preTransform = 0
             self.build_input.transformFormat = OPTIX_TRANSFORM_FORMAT_NONE
 
+        self.c_opacity_micromap = opacity_micromap
+        if self.c_opacity_micromap is not None:
+            self.build_input.opacityMicromap = self.c_opacity_micromap.build_input
+
+
     def __dealloc__(self):
         pass
 
     cdef void prepare_build_input(self, OptixBuildInput* build_input) except *:
-        build_input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES
+        build_input.type = self.build_input_type
         build_input.triangleArray = self.build_input
 
     def _vertex_format(self, dtype, shape):
@@ -238,6 +256,19 @@ cdef class BuildInputTriangleArray(BuildInputArray):
     cdef size_t num_elements(self):
         return self.build_input.numVertices
 
+    @property
+    def micromap(self):
+        return self.c_opacity_micromap
+
+    @property
+    def num_sbt_records(self):
+        return self.build_input.numSbtRecords
+
+
+    def _repr_details(self):
+        return f"nvertices={self.num_elements()}, " \
+               f"ntriangles={self._d_index_buffer.shape[0] if self._d_index_buffer is not None else self.num_elements() // 3}, " \
+               f"n_sbt_records={self.build_input.numSbtRecords}"
 
 cdef class BuildInputCustomPrimitiveArray(BuildInputArray):
     """
@@ -267,6 +298,7 @@ cdef class BuildInputCustomPrimitiveArray(BuildInputArray):
                  sbt_record_offset_buffer = None,
                  primitive_index_offset = 0
                  ):
+        super().__init__(BuildInputType.CUSTOM_PRIMITIVES)
         self._d_aabb_buffers = [cp.asarray(ab, dtype=np.float32).reshape(-1, 6) for ab in aabb_buffers]
         self._d_aabb_buffer_ptrs.reserve(len(self._d_aabb_buffers))
 
@@ -317,7 +349,7 @@ cdef class BuildInputCustomPrimitiveArray(BuildInputArray):
         self.build_input.primitiveIndexOffset = primitive_index_offset
 
     cdef void prepare_build_input(self, OptixBuildInput * build_input) except *:
-        build_input.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES
+        build_input.type = self.build_input_type
         build_input.customPrimitiveArray = self.build_input
 
     cdef size_t num_elements(self):
@@ -358,7 +390,7 @@ cdef class BuildInputCurveArray(BuildInputArray):
                  flags=None,
                  primitive_index_offset=0,
                  endcap_flags=CurveEndcapFlags.DEFAULT):
-
+        super().__init__(BuildInputType.CURVES)
         self.build_input.curveType = curve_type.value
         self._d_vertex_buffers = [cp.asarray(vb, np.float32) for vb in ensure_iterable(vertex_buffers)]
         self._d_vertex_buffer_ptrs.reserve(len(self._d_vertex_buffers))
@@ -417,119 +449,123 @@ cdef class BuildInputCurveArray(BuildInputArray):
 
         self.build_input.primitiveIndexOffset = primitive_index_offset
 
-        IF _OPTIX_VERSION > 70300:
-            self.build_input.endcapFlags = endcap_flags # only for Optix versions >= 7.4
+        self.build_input.endcapFlags = endcap_flags
 
     cdef void prepare_build_input(self, OptixBuildInput * build_input) except *:
-        build_input.type = OPTIX_BUILD_INPUT_TYPE_CURVES
+        build_input.type = self.build_input_type
         build_input.curveArray = self.build_input
 
     cdef size_t num_elements(self):
         return self.build_input.numPrimitives
 
 
-IF _OPTIX_VERSION > 70400:
-    cdef class BuildInputSphereArray(BuildInputArray):
+cdef class BuildInputSphereArray(BuildInputArray):
+    """
+        BuildInputArray for a sphere. This class wraps the OptixBuildInputSphereArray struct.
+        In Contrast to the behavior of the Optix C++ API, this Python class will automatically convert all numpy.ndarrays
+        to cupy.ndarrays and keep track of them.
+
+        Parameters
+        ----------
+        vertex_buffers:
+            List of vertex buffers (one for each motion step) or a single array.
+            All arrays will be converted to cupy.ndarrays before any further processing.
+        index_buffer: ndarray, optional
+            A single 2d array containing the indices of all triangles or None
+        num_sbt_records: int
+            The number of records in the ShaderBindingTable for this geometry
+        flags: GeometryFlags
+            Flags to use in this input for each motionstep
+        sbt_record_offset_buffer: ndarray, optional
+            Offsets into the ShaderBindingTable record for each primitive (index) or None
+        pre_transform: ndarray(3,4) or None
+            A transform to apply prior to processing
+        primitive_index_offset: int
+            The offset applied to the primitive index in device code
         """
-            BuildInputArray for a sphere. This class wraps the OptixBuildInputSphereArray struct.
-            In Contrast to the behavior of the Optix C++ API, this Python class will automatically convert all numpy.ndarrays
-            to cupy.ndarrays and keep track of them.
+    def __init__(self,
+                 vertex_buffers,
+                 radius_buffers,
+                 num_sbt_records = 1,
+                 flags = None,
+                 sbt_record_offset_buffer = None,
+                 pre_transform = None,
+                 primitive_index_offset = 0
+                 ):
+        super().__init__(BuildInputType.SPHERES)
+        self._d_vertex_buffers = [cp.asarray(vb) for vb in ensure_iterable(vertex_buffers)]
+        self._d_vertex_buffer_ptrs.reserve(len(self._d_vertex_buffers))
 
-            Parameters
-            ----------
-            vertex_buffers:
-                List of vertex buffers (one for each motion step) or a single array.
-                All arrays will be converted to cupy.ndarrays before any further processing.
-            index_buffer: ndarray, optional
-                A single 2d array containing the indices of all triangles or None
-            num_sbt_records: int
-                The number of records in the ShaderBindingTable for this geometry
-            flags: GeometryFlags
-                Flags to use in this input for each motionstep
-            sbt_record_offset_buffer: ndarray, optional
-                Offsets into the ShaderBindingTable record for each primitive (index) or None
-            pre_transform: ndarray(3,4) or None
-                A transform to apply prior to processing
-            primitive_index_offset: int
-                The offset applied to the primitive index in device code
-            """
-        def __init__(self,
-                     vertex_buffers,
-                     radius_buffers,
-                     num_sbt_records = 1,
-                     flags = None,
-                     sbt_record_offset_buffer = None,
-                     pre_transform = None,
-                     primitive_index_offset = 0
-                     ):
+        self._d_radius_buffers = [cp.asarray(vb) for vb in ensure_iterable(radius_buffers)]
+        self._d_radius_buffer_ptrs.reserve(len(self._d_radius_buffers))
 
-            self._d_vertex_buffers = [cp.asarray(vb) for vb in ensure_iterable(vertex_buffers)]
-            self._d_vertex_buffer_ptrs.reserve(len(self._d_vertex_buffers))
+        if len(self._d_radius_buffers) != len(self._d_vertex_buffers):
+            raise ValueError("Argument radius_buffers must have the same number of arrays as vertex_buffers.")
 
-            self._d_radius_buffers = [cp.asarray(vb) for vb in ensure_iterable(radius_buffers)]
-            self._d_radius_buffer_ptrs.reserve(len(self._d_radius_buffers))
+        if len(self._d_vertex_buffers) == 0:
+            raise ValueError("BuildInputSphereArray cannot be empty.")
 
-            if len(self._d_radius_buffers) != len(self._d_vertex_buffers):
-                raise ValueError("Argument radius_buffers must have the same number of arrays as vertex_buffers.")
+        dtype = self._d_vertex_buffers[0].dtype
+        shape = self._d_vertex_buffers[0].shape
+        strides = self._d_vertex_buffers[0].strides
 
-            if len(self._d_vertex_buffers) == 0:
-                raise ValueError("BuildInputSphereArray cannot be empty.")
+        radius_dtype = self._d_radius_buffers[0].dtype
+        radius_shape = self._d_radius_buffers[0].shape
+        strides = self._d_radius_buffers[0].strides
 
-            dtype = self._d_vertex_buffers[0].dtype
-            shape = self._d_vertex_buffers[0].shape
-            strides = self._d_vertex_buffers[0].strides
+        for vb, rb in zip(self._d_vertex_buffers, self._d_radius_buffers):
+            if vb.dtype != dtype or vb.shape != shape or vb.strides != strides:
+                raise ValueError("All vertex buffers must have the same size and dtype.")
+            self._d_vertex_buffer_ptrs.push_back(vb.data.ptr)
 
-            radius_dtype = self._d_radius_buffers[0].dtype
-            radius_shape = self._d_radius_buffers[0].shape
-            strides = self._d_radius_buffers[0].strides
+            if rb.dtype != dtype or rb.shape != shape or rb.strides != strides:
+                raise ValueError("All radius buffers must have the same size and dtype.")
+            self._d_radius_buffer_ptrs.push_back(rb.data.ptr)
 
-            for vb, rb in zip(self._d_vertex_buffers, self._d_radius_buffers):
-                if vb.dtype != dtype or vb.shape != shape or vb.strides != strides:
-                    raise ValueError("All vertex buffers must have the same size and dtype.")
-                self._d_vertex_buffer_ptrs.push_back(vb.data.ptr)
+        self.build_input.vertexBuffers = self._d_vertex_buffer_ptrs.const_data()
+        self.build_input.radiusBuffers = self._d_radius_buffer_ptrs.const_data()
 
-                if rb.dtype != dtype or rb.shape != shape or rb.strides != strides:
-                    raise ValueError("All radius buffers must have the same size and dtype.")
-                self._d_radius_buffer_ptrs.push_back(rb.data.ptr)
+        self.build_input.vertexStrideInBytes = self._d_vertex_buffers[0].strides[0]
+        self.build_input.radiusStrideInBytes = self._d_radius_buffers[0].strides[0]
 
-            self.build_input.vertexBuffers = self._d_vertex_buffer_ptrs.const_data()
-            self.build_input.radiusBuffers = self._d_radius_buffer_ptrs.const_data()
+        self.build_input.numVertices = shape[0]
+        self.build_input.singleRadius = 1 if self._d_radius_buffers[0].shape[0] == 1 else 0
 
-            self.build_input.vertexStrideInBytes = self._d_vertex_buffers[0].strides[0]
-            self.build_input.radiusStrideInBytes = self._d_radius_buffers[0].strides[0]
+        self.build_input.numSbtRecords = num_sbt_records
+        self._flags.resize(num_sbt_records)
 
-            self.build_input.numVertices = shape[0]
-            self.build_input.singleRadius = 1 if self._d_radius_buffers[0].shape[0] == 1 else 0
+        if flags is None:
+            for i in range(num_sbt_records):
+                self._flags[i] = OPTIX_GEOMETRY_FLAG_NONE
+        else:
+            for i in range(num_sbt_records):
+                self._flags[i] = flags[i].value
 
-            self.build_input.numSbtRecords = num_sbt_records
-            self._flags.resize(num_sbt_records)
-
-            if flags is None:
-                for i in range(num_sbt_records):
-                    self._flags[i] = OPTIX_GEOMETRY_FLAG_NONE
-            else:
-                for i in range(num_sbt_records):
-                    self._flags[i] = flags[i].value
-
-            self.build_input.flags = self._flags.data()
+        self.build_input.flags = self._flags.data()
 
 
-            if sbt_record_offset_buffer is not None:
-                self._d_sbt_offset_buffer = cp.asarray(sbt_record_offset_buffer).ravel()
-                self.build_input.sbtIndexOffsetBuffer = self._d_sbt_offset_buffer.data.ptr
-                itemsize = self._d_sbt_offset_buffer.itemsize
-                if itemsize > 4:
-                    raise ValueError("Only 32 bit allowed at max")
-                self.build_input.sbtIndexOffsetSizeInBytes = itemsize
-                self.build_input.sbtIndexOffsetStrideInBytes = self._d_sbt_offset_buffer.strides[0]
-            else:
-                self.build_input.sbtIndexOffsetBuffer = 0
-                self.build_input.sbtIndexOffsetStrideInBytes = 0
-                self.build_input.sbtIndexOffsetSizeInBytes = 0
+        if sbt_record_offset_buffer is not None:
+            self._d_sbt_offset_buffer = cp.asarray(sbt_record_offset_buffer).ravel()
+            self.build_input.sbtIndexOffsetBuffer = self._d_sbt_offset_buffer.data.ptr
+            itemsize = self._d_sbt_offset_buffer.itemsize
+            if itemsize > 4:
+                raise ValueError("Only 32 bit allowed at max")
+            self.build_input.sbtIndexOffsetSizeInBytes = itemsize
+            self.build_input.sbtIndexOffsetStrideInBytes = self._d_sbt_offset_buffer.strides[0]
+        else:
+            self.build_input.sbtIndexOffsetBuffer = 0
+            self.build_input.sbtIndexOffsetStrideInBytes = 0
+            self.build_input.sbtIndexOffsetSizeInBytes = 0
 
-            self.build_input.primitiveIndexOffset = primitive_index_offset
+        self.build_input.primitiveIndexOffset = primitive_index_offset
 
-    __all__.append('BuildInputSphereArray')
+    cdef void prepare_build_input(self, OptixBuildInput * build_input) except *:
+        build_input.type = self.build_input_type
+        build_input.sphereArray = self.build_input
+
+    cdef size_t num_elements(self):
+        return self.build_input.numVertices
+
 
 cdef class Instance(OptixObject):
     """
@@ -584,14 +620,17 @@ cdef class Instance(OptixObject):
         # update the handle as well
         self.instance.traversableHandle = self.traversable.handle
 
-    def __deepcopy__(self, memodict={}):
-        from copy import deepcopy
+    def relocate(self,
+                 device: typ.Optional[DeviceContext] = None,
+                 stream: typ.Optional[cp.cuda.Stream] = None):
         cls = self.__class__
         result = cls.__new__(cls)
-        memodict[id(self)] = result
         result.instance = self.instance
-        result.traversable = deepcopy(self.traversable)
+        result.traversable = self.traversable.relocate(device=device, stream=stream)
 
+    def __deepcopy__(self, memo):
+        result = self.relocate()
+        memo[id(self)] = result
         return result
 
     @property
@@ -617,6 +656,7 @@ cdef class BuildInputInstanceArray(BuildInputArray):
         A list of the Instances to use as input
     """
     def __init__(self, instances):
+        super().__init__(BuildInputType.INSTANCES)
         instances = ensure_iterable(instances)
         self.instances = instances
 
@@ -633,7 +673,7 @@ cdef class BuildInputInstanceArray(BuildInputArray):
         self.build_input.numInstances = len(instances)
 
     cdef void prepare_build_input(self, OptixBuildInput * build_input) except *:
-        build_input.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES
+        build_input.type = self.build_input_type
         build_input.instanceArray = self.build_input
 
     cdef size_t num_elements(self):
@@ -684,6 +724,92 @@ cdef class BuildInputInstanceArray(BuildInputArray):
         return cp.ndarray(shape=(3,4), dtype=np.float32, memptr=device_ptr)
 
 
+cdef class RelocationDependency:
+    cdef OptixBuildInputType _type
+
+    def __init__(self, type):
+        self._type = <OptixBuildInputType><int>(BuildInputType(type).value)
+
+    @property
+    def type(self):
+        return BuildInputType(self._type)
+
+    cdef RelocationDependency relocate(self, device, stream):
+        return self
+
+    cdef void fill_relocation_input(self, OptixRelocateInput& input):
+        input.type = self._type
+
+    cdef void finalize_relocation_input(self):
+        pass
+
+cdef class RelocationInstanceDependency(RelocationDependency):
+    cdef object instances
+    cdef object d_instances
+
+    def __init__(self, instances):
+        super().__init__(BuildInputType.INSTANCES)
+        self.instances = instances
+        self.d_instances = None
+
+    cdef RelocationInstanceDependency relocate(self, device, stream):
+        relocated_instances = [inst.relocate(device=device, stream=stream) for inst in self.instances]
+        result = self.__class__(relocated_instances)
+        return result
+
+    cdef void fill_relocation_input(self, OptixRelocateInput& input):
+        cdef vector[OptixTraversableHandle] c_instance_handles
+        cdef ssize_t c_instance_handles_size = 0
+        cdef object d_instances
+        cdef size_t i
+        cdef CUdeviceptr d_instances_ptr = 0
+        cdef vector[OptixRelocateInput] c_relocate_inputs
+        cdef size_t num_relocate_inputs
+
+        input.type = self.type
+        input.instanceArray.numInstances = len(self.instances)
+
+        # prepare the new instance handles for relocation by copiing them into a temporary device buffer
+        c_instance_handles.resize(len(self.instances))
+        c_instance_handles_size = sizeof(OptixTraversableHandle) * c_instance_handles.size()
+
+        self.d_instances = cp.cuda.alloc(c_instance_handles_size)
+        for i in range(c_instance_handles.size()):
+            c_instance_handles[i] = self.instances[i].traversable.handle
+
+        d_instances_ptr = self.d_instances.ptr
+        cp.cuda.runtime.memcpy(d_instances_ptr, <size_t> c_instance_handles.data(), c_instance_handles_size,
+                               cp.cuda.runtime.memcpyHostToDevice)
+        c_relocate_inputs[0].instanceArray.traversableHandles = d_instances_ptr
+        input.instanceArray.traversableHandles = d_instances_ptr
+
+    cdef void finalize_relocation_input(self):
+        self.d_instances = None # remove the temporary cuda buffer again
+
+
+cdef class RelocationTriangleDependency(RelocationDependency):
+    cdef unsigned int num_sbt_records
+    cdef OpacityMicromapArray micromap
+
+    def __init__(self, num_sbt_records, micromap=None):
+        super().__init__(BuildInputType.INSTANCES)
+        self.num_sbt_records = num_sbt_records
+        self.micromap = micromap
+
+    cdef RelocationInstanceDependency relocate(self, device, stream):
+        if self.micromap is not None:
+            relocated_micromap = self.micromap.relocate(device=device, stream=stream)
+        else:
+            relocated_micromap = None
+        result = self.__class__(self.num_sbt_records, relocated_micromap)
+        return result
+
+    cdef void fill_relocation_input(self, OptixRelocateInput& input):
+        input.type = self.type
+        input.triangleArray.numSbtRecords = self.num_sbt_records
+        input.triangleArray.opacityMicromap.opacityMicromapArray = self.micromap.d_micromap_array_buffer.ptr
+
+
 cdef class AccelerationStructure(OptixContextObject):
     """
     Class representing a Geometry Acceleration Structure (GAS) or Instance Acceleration Structure (IAS). This wraps the OptixTraversableHandle internally and manages the ressources like
@@ -706,6 +832,10 @@ cdef class AccelerationStructure(OptixContextObject):
         Allow for random access of the vertices in triangle geometry
     random_instance_access: bool
         Allow for random access of the instances if an IAS is built
+    allow_opacity_micromap_update: bool
+        Allows to update the opacity micromaps in this structure
+    allow_disable_opacity_micromaps: bool
+        Allows to disable the opacity micromaps for instances in this structure
     stream: cupy.cuda.Stream, optional
         Cuda stream to use. If None the default stream is used
     """
@@ -717,6 +847,8 @@ cdef class AccelerationStructure(OptixContextObject):
                  prefer_fast_build=False,
                  random_vertex_access=False,
                  random_instance_access=False,
+                 allow_opacity_micromap_update=False,
+                 allow_disable_opacity_micromaps=False,
                  stream=None):
 
         super().__init__(context)
@@ -735,9 +867,15 @@ cdef class AccelerationStructure(OptixContextObject):
             self._build_flags |= OPTIX_BUILD_FLAG_ALLOW_RANDOM_VERTEX_ACCESS
         if random_instance_access:
             self._build_flags |= OPTIX_BUILD_FLAG_ALLOW_RANDOM_INSTANCE_ACCESS
+        if allow_opacity_micromap_update:
+            self._build_flags |= OPTIX_BUILD_FLAG_ALLOW_OPACITY_MICROMAP_UPDATE
+        if allow_disable_opacity_micromaps:
+            self._build_flags |= OPTIX_BUILD_FLAG_ALLOW_DISABLE_OPACITY_MICROMAPS
+
 
         self._gas_buffer = None
         self._instances = None
+        self._relocate_deps = []
         build_inputs = ensure_iterable(build_inputs)
         self.build(build_inputs, stream=stream)
 
@@ -778,14 +916,23 @@ cdef class AccelerationStructure(OptixContextObject):
     cdef void build(self, build_inputs, stream=None):
         # build a single vector from all the build inputs
         cdef size_t inputs_size = len(build_inputs)
-        cdef vector[OptixBuildInput] inputs #= vector[OptixBuildInput](inputs_size)
+        cdef vector[OptixBuildInput] c_inputs #= vector[OptixBuildInput](inputs_size)
+        cdef size_t i
 
-        self._init_build_inputs(build_inputs, inputs)
+        self._init_build_inputs(build_inputs, c_inputs)
 
-        if isinstance(build_inputs[0], BuildInputInstanceArray):
-            if inputs_size > 1:
-                raise ValueError("Only a single build input allowed for instance builds")
-            self._instances = (<BuildInputInstanceArray>build_inputs[0]).instances # keep the instances so the buffers do not get deleted
+        for build_input in build_inputs:
+            if isinstance(build_input, BuildInputInstanceArray):
+                relocation_dep = RelocationInstanceDependency((<BuildInputInstanceArray>build_input).instances)
+                if inputs_size > 1:
+                    raise ValueError("Only a single build input allowed for instance builds")
+            elif isinstance(build_input, BuildInputTriangleArray):
+                micromap = <BuildInputTriangleArray>build_input.micromap
+                micromap_array = micromap.micromap_array if micromap is not None else None
+                relocation_dep = RelocationTriangleDependency(build_input.num_sbt_records, micromap=micromap_array)
+            else:
+                relocation_dep = RelocationDependency(build_input.type)
+            self._relocate_deps.append(relocation_dep)
 
         cdef vector[OptixAccelBuildOptions] accel_options# = vector[OptixAccelBuildOptions](inputs_size)
         self._init_accel_options(inputs_size, self._build_flags, OPTIX_BUILD_OPERATION_BUILD, accel_options)
@@ -798,7 +945,7 @@ cdef class AccelerationStructure(OptixContextObject):
 
         optix_check_return(optixAccelComputeMemoryUsage(self.context.c_context,
                                                         accel_options.data(),
-                                                        inputs.data(),
+                                                        c_inputs.data(),
                                                         inputs_size,
                                                         &self._buffer_sizes))
 
@@ -827,7 +974,7 @@ cdef class AccelerationStructure(OptixContextObject):
             optix_check_return(optixAccelBuild(self.context.c_context,
                                                <CUstream>c_stream,
                                                accel_options.data(),
-                                               inputs.data(),
+                                               c_inputs.data(),
                                                inputs_size,
                                                tmp_gas_buffer_ptr,
                                                self._buffer_sizes.tempSizeInBytes,
@@ -871,6 +1018,8 @@ cdef class AccelerationStructure(OptixContextObject):
 
         cdef size_t inputs_size = len(build_inputs)
 
+        if inputs_size != len(self._relocate_deps):
+            raise ValueError("Number of build inputs given to update() must be the same as the one used to build this GAS")
         cdef vector[OptixBuildInput] inputs #= vector[OptixBuildInput](inputs_size)
         self._init_build_inputs(build_inputs, inputs)
 
@@ -903,30 +1052,50 @@ cdef class AccelerationStructure(OptixContextObject):
                                                NULL,
                                                0))
 
-    def __deepcopy__(self, memodict={}):
+    def __deepcopy__(self, memo):
         """
-        Perform a deep copy of the AccelerationStructure by using the standard python copy.deepcopy function. This method
-        will also handle any necessary relocation tasks required by optiX on a copy.
+        Perform a deep copy of the AccelerationStructure by using the standard python copy.deepcopy function.
+        """
+        # relocate on the same device to perform a regular deep copy
+        result = self.relocate(device=None)
+        memo[id(self)] = result
+        return result
+
+
+    def relocate(self,
+                 device: typ.Optional[DeviceContext] = None,
+                 stream: typ.Optional[cp.cuda.Stream] = None):
+        """
+        Relocate this acceleration structure into another copy. Usually this is equivalent to a deep copy.
+        Additionally, the accleration structure can be copied to a different defice by specifying the device
+        parameter with a different DeviceContext.
 
         Parameters
         ----------
-        memodict
-
+        device:
+            An optional DeviceContext. The resulting copy of the acceleration structure will be copied
+            to this device. If None, the acceleration structure's current device is used.
+        stream:
+            The stream to use for the relocation. If None, the default stream (0) is used.
         Returns
         -------
         copy: AccelerationStructure
-            The copy of the AccelerationStructure
+            The copy of the AccelerationStructure on the new device
 
         """
         from copy import deepcopy
         # relocate the optix structure
-        cdef OptixAccelRelocationInfo gas_info
-        memset(&gas_info, 0, sizeof(OptixAccelRelocationInfo)) # init struct to 0
+        cdef OptixRelocationInfo gas_info
+        memset(&gas_info, 0, sizeof(OptixRelocationInfo)) # init struct to 0
 
         optix_check_return(optixAccelGetRelocationInfo(self.context.c_context, self._handle, &gas_info))
 
+        if device is None:
+            device = self.context
+
+        # check if the new device is compatible with this acceleration structure
         cdef int compatible = 0
-        optix_check_return(optixAccelCheckRelocationCompatibility(self.context.c_context,
+        optix_check_return(optixCheckRelocationCompatibility(<OptixDeviceContext>(<DeviceContext>device).c_context,
                                                                   &gas_info,
                                                                   &compatible))
         if compatible != 1:
@@ -936,46 +1105,52 @@ cdef class AccelerationStructure(OptixContextObject):
         cls = self.__class__
         cdef AccelerationStructure result = cls.__new__(cls)
 
-        memodict[id(self)] = result
-
-        result.context = self.context
+        result.context = device
         result._build_flags = self._build_flags
         result._buffer_sizes = self._buffer_sizes
-        result._instances = deepcopy(self._instances) # copy all instances and their AccelerationStructures first
-    
+
+        #if self._instances is not None:
+        #    result._instances = [inst.relocate(device=device, stream=stream) for inst in self._instances] # copy all instances and their AccelerationStructures first
+
         buffer_size = round_up(self._buffer_sizes.outputSizeInBytes, 8) + 8
         result._gas_buffer = cp.cuda.alloc(buffer_size)
         cp.cuda.runtime.memcpy(result._gas_buffer.ptr, self._gas_buffer.ptr, buffer_size, cp.cuda.runtime.memcpyDeviceToDevice)
 
-        cdef vector[OptixTraversableHandle] c_instance_handles
-        cdef ssize_t c_instance_handles_size = 0
-        cdef object d_instances
-        cdef size_t i
-        cdef CUdeviceptr d_instances_ptr = 0
+        #cdef vector[OptixTraversableHandle] c_instance_handles
+        #cdef ssize_t c_instance_handles_size = 0
+        #cdef object d_instances
+        #cdef size_t i
+        #cdef CUdeviceptr d_instances_ptr = 0
+        cdef vector[OptixRelocateInput] c_relocate_inputs
+        #cdef size_t num_relocate_inputs
+        c_relocate_inputs.resize(len(self._relocate_deps))
 
-        if result._instances is not None:
-            # prepare the new instance handles for relocation
-            c_instance_handles.resize(len(result._instances))
-            c_instance_handles_size = sizeof(OptixTraversableHandle) * c_instance_handles.size()
-            d_instances = cp.cuda.alloc(c_instance_handles_size)
-            for i in range(c_instance_handles.size()):
-                c_instance_handles[i] = result._instances[i].traversable.handle
-            d_instances_ptr = d_instances.ptr
-            cp.cuda.runtime.memcpy(d_instances_ptr, <size_t>c_instance_handles.data(), c_instance_handles_size, cp.cuda.runtime.memcpyHostToDevice)
+        # prepare to relocate the dependencies (micromaps and instances)
+        result._relocate_deps = []
+        for i, dep in enumerate(self._relocate_deps):
+            relocated_dep = dep.relocate(device, stream)
+            result._relocate_deps.append(relocated_dep)
+            relocated_dep.fill_relocation_input(c_relocate_inputs[i])
 
         result._handle = 0
-
         cdef uintptr_t c_stream = 0
+
+        if stream is not None:
+            c_stream = stream.ptr
+
         cdef OptixTraversableHandle c_handle = 0
         optix_check_return(optixAccelRelocate(result.context.c_context,
                                               <CUstream>c_stream,
                                               &gas_info,
-                                              d_instances_ptr,
-                                              c_instance_handles_size,
+                                              &c_relocate_inputs[0],
+                                              c_relocate_inputs.size(),
                                               result._gas_buffer,
                                               self._buffer_sizes.outputSizeInBytes,
                                               &c_handle))
         result._handle = c_handle
+
+        for dep in result._relocate_deps:
+            dep.finalize_relocation_input()
 
         return result
 

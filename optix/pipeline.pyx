@@ -15,6 +15,9 @@ from .shader_binding_table cimport ShaderBindingTable
 
 optix_init()
 
+__all__ = ['CompileDebugLevel', 'ExceptionFlags', 'TraversableGraphFlags', 'PrimitiveTypeFlags',
+           'PipelineCompileOptions', 'PipelineLinkOptions', 'Pipeline']
+
 
 class ExceptionFlags(IntFlag):
     """
@@ -45,34 +48,20 @@ class PrimitiveTypeFlags(IntFlag):
     ROUND_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE,
     ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
     ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR
-
-    # switch to new primitive type flags
-    IF _OPTIX_VERSION > 70300:  # switch to new compile debug level flags
-        ROUND_CATMULLROM = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CATMULLROM
-    IF _OPTIX_VERSION > 70400:
-        SPHERE = OPTIX_PRIMITIVE_TYPE_FLAGS_SPHERE
+    ROUND_CATMULLROM = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CATMULLROM
+    SPHERE = OPTIX_PRIMITIVE_TYPE_FLAGS_SPHERE
     TRIANGLE = <unsigned int>OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE # fixes negative number error
 
 
-IF _OPTIX_VERSION > 70300:  # switch to new compile debug level flags
-    class CompileDebugLevel(IntEnum):
-        """
-        Wraps the OptixCompileDebugLevel enum.
-        """
-        DEFAULT = OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
-        NONE = OPTIX_COMPILE_DEBUG_LEVEL_NONE,
-        MINIMAL = OPTIX_COMPILE_DEBUG_LEVEL_MINIMAL,
-        MODERATE = OPTIX_COMPILE_DEBUG_LEVEL_MODERATE,
-        FULL = OPTIX_COMPILE_DEBUG_LEVEL_FULL
-ELSE:
-    class CompileDebugLevel(IntEnum):
-        """
-        Wraps the OptixCompileDebugLevel enum.
-        """
-        DEFAULT = OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
-        NONE = OPTIX_COMPILE_DEBUG_LEVEL_NONE,
-        LINEINFO = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO,
-        FULL = OPTIX_COMPILE_DEBUG_LEVEL_FULL
+class CompileDebugLevel(IntEnum):
+    """
+    Wraps the OptixCompileDebugLevel enum.
+    """
+    DEFAULT = OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
+    NONE = OPTIX_COMPILE_DEBUG_LEVEL_NONE,
+    MINIMAL = OPTIX_COMPILE_DEBUG_LEVEL_MINIMAL,
+    MODERATE = OPTIX_COMPILE_DEBUG_LEVEL_MODERATE,
+    FULL = OPTIX_COMPILE_DEBUG_LEVEL_FULL
 
 
 cdef class PipelineCompileOptions(OptixObject):
@@ -88,7 +77,8 @@ cdef class PipelineCompileOptions(OptixObject):
                  num_attribute_values = 0,
                  exception_flags = ExceptionFlags.NONE,
                  pipeline_launch_params_variable_name = "params",
-                 uses_primitive_type_flags = PrimitiveTypeFlags.DEFAULT):
+                 uses_primitive_type_flags = PrimitiveTypeFlags.DEFAULT,
+                 allow_opacity_micromaps=False):
         self.uses_motion_blur = uses_motion_blur
         self.traversable_graph_flags = traversable_graph_flags
         self.num_payload_values = num_payload_values
@@ -96,6 +86,7 @@ cdef class PipelineCompileOptions(OptixObject):
         self.exception_flags = exception_flags
         self.pipeline_launch_params_variable_name = pipeline_launch_params_variable_name
         self.uses_primitive_type_flags = uses_primitive_type_flags
+        self.allow_opacity_micromaps = allow_opacity_micromaps
 
     @property
     def uses_motion_blur(self):
@@ -155,6 +146,14 @@ cdef class PipelineCompileOptions(OptixObject):
     @uses_primitive_type_flags.setter
     def uses_primitive_type_flags(self, flags):
         self.compile_options.usesPrimitiveTypeFlags = flags.value
+
+    @property
+    def allow_opacity_micromaps(self):
+        return self.compile_options.allowOpacityMicromaps
+
+    @allow_opacity_micromaps.setter
+    def allow_opacity_micromaps(self, allow):
+        self.compile_options.allowOpacityMicromaps = allow
 
     @property
     def c_obj(self):

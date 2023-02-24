@@ -8,6 +8,9 @@ import numpy as np
 
 optix_init()
 
+__all__ = ['ShaderBindingTable']
+
+
 cdef class ShaderBindingTable(OptixObject):
     """
     Represents a ShaderBindingTable, containing data used by the various programs in the OptiX Pipeline.

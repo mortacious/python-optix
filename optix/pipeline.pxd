@@ -23,47 +23,22 @@ cdef extern from "optix_includes.h" nogil:
         OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS,
         OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING
 
-    IF _OPTIX_VERSION > 70400:  # switch to new primitive type flags
-        cdef enum OptixPrimitiveTypeFlags:
-            OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM,
-            OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE,
-            OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
-            OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR,
-            OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CATMULLROM,
-            OPTIX_PRIMITIVE_TYPE_FLAGS_SPHERE,
-            OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE,
-    ELIF _OPTIX_VERSION > 70300:
-        cdef enum OptixPrimitiveTypeFlags:
-            OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM,
-            OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE,
-            OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
-            OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR,
-            OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CATMULLROM,
-            OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE,
-    ELSE:
-        cdef enum OptixPrimitiveTypeFlags:
-            OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM,
-            OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE,
-            OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
-            OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR,
-            OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE
+    cdef enum OptixPrimitiveTypeFlags:
+        OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM,
+        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE,
+        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
+        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR,
+        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CATMULLROM,
+        OPTIX_PRIMITIVE_TYPE_FLAGS_SPHERE,
+        OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE,
 
 
-    IF _OPTIX_VERSION > 70300:  # switch to new compile debug level
-        cdef enum OptixCompileDebugLevel:
-            OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
-            OPTIX_COMPILE_DEBUG_LEVEL_NONE,
-            OPTIX_COMPILE_DEBUG_LEVEL_MINIMAL,
-            OPTIX_COMPILE_DEBUG_LEVEL_MODERATE,
-            OPTIX_COMPILE_DEBUG_LEVEL_FULL
-    ELSE:
-        cdef enum OptixCompileDebugLevel:
-            OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
-            OPTIX_COMPILE_DEBUG_LEVEL_NONE,
-            OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO,
-            OPTIX_COMPILE_DEBUG_LEVEL_FULL
-
-
+    cdef enum OptixCompileDebugLevel:
+        OPTIX_COMPILE_DEBUG_LEVEL_DEFAULT,
+        OPTIX_COMPILE_DEBUG_LEVEL_NONE,
+        OPTIX_COMPILE_DEBUG_LEVEL_MINIMAL,
+        OPTIX_COMPILE_DEBUG_LEVEL_MODERATE,
+        OPTIX_COMPILE_DEBUG_LEVEL_FULL
 
 
     cdef struct OptixPipelineCompileOptions:
@@ -74,6 +49,7 @@ cdef extern from "optix_includes.h" nogil:
         unsigned int exceptionFlags
         const char * pipelineLaunchParamsVariableName
         unsigned int usesPrimitiveTypeFlags
+        int allowOpacityMicromaps
 
 
     cdef struct OptixPipelineLinkOptions:

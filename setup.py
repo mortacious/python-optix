@@ -1,11 +1,12 @@
-from struct import pack
-from setuptools import setup, Extension, find_packages, find_namespace_packages
+from setuptools import setup, Extension, find_packages
 from Cython.Build import cythonize
 import re
 import os
 from pathlib import Path
 import shutil
+import numpy
 
+OPTIX_COMPATIBLE_VERSION = (7, 6)
 
 # standalone import of a module (https://stackoverflow.com/a/58423785)
 def import_module_from_path(path):
@@ -33,8 +34,10 @@ cuda_include_path = util.get_cuda_include_path()
 optix_include_path = util.get_optix_include_path()
 print("Found cuda includes at", cuda_include_path)
 print("Found optix includes at", optix_include_path)
-if cuda_include_path is None or optix_include_path is None:
-    raise RuntimeError("Cuda or optix not found in the system")
+if cuda_include_path is None:
+    raise RuntimeError("CUDA not found in the system, but is required to build this package.")
+if optix_include_path is None:
+    raise RuntimeError("OptiX not found in the system, but is required to build this package.")
 
 optix_version_re = re.compile(r'.*OPTIX_VERSION +(\d{5})')  # get the optix version from the header
 with open(Path(optix_include_path) / "optix.h", 'r') as f:
@@ -45,10 +48,11 @@ optix_version_major = optix_version // 10000
 optix_version_minor = (optix_version % 10000) // 100
 optix_version_micro = optix_version % 100
 
-print(f"Found OptiX version {optix_version_major}.{optix_version_minor}.{optix_version_micro}.")
+if (optix_version_major, optix_version_minor) != OPTIX_COMPATIBLE_VERSION:
+    raise ValueError(f"Found unsupported optix version {optix_version_major}.{optix_version_minor}.{optix_version_micro}. This package"
+                     f"requires an optix version of {OPTIX_COMPATIBLE_VERSION[0]}.{OPTIX_COMPATIBLE_VERSION[1]}.x.")
 
 cython_compile_env = {
-    '_OPTIX_VERSION': optix_version,
     '_OPTIX_VERSION_MAJOR': optix_version_major,
     '_OPTIX_VERSION_MINOR': optix_version_minor,
     '_OPTIX_VERSION_MICRO': optix_version_micro
@@ -60,9 +64,9 @@ if os.name == 'nt':
     libraries.append('advapi32')
 
 extensions = [Extension("*", ["optix/*.pyx"],
-                        include_dirs=[cuda_include_path, optix_include_path], libraries=libraries)]
+                        include_dirs=[cuda_include_path, optix_include_path, numpy.get_include()], libraries=libraries)]
 extensions = cythonize(extensions, language_level="3",
-                        compile_time_env=cython_compile_env, build_dir="build")
+                        compile_time_env=cython_compile_env, build_dir="build", annotate=True)
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -79,6 +83,7 @@ try:
         package_path = Path(f'./{package_name}').resolve()
         return [str(path.relative_to(package_path)) 
                 for path in package_path.glob(glob)]
+
 
     class custom_bdist_wheel(_bdist_wheel):
         def finalize_options(self):
