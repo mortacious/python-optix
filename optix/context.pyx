@@ -144,13 +144,13 @@ cdef class DeviceContext(OptixObject):
         """
         The callback function for logging
         """
-        return self._log_callback_function
+        return self._log_callback
 
     @log_callback.setter
     def log_callback(self, object log_callback_function):
-        self._log_callback_function = log_callback_function
-        if self._log_callback_function is not None:
-            optix_check_return(optixDeviceContextSetLogCallback(self.c_context, context_log_cb, <void*>self._log_callback_function, self._log_callback_level))
+        self._log_callback = log_callback_function
+        if self._log_callback is not None:
+            optix_check_return(optixDeviceContextSetLogCallback(self.c_context, context_log_cb, <void*>self._log_callback, self._log_callback_level))
 
     @property
     def log_callback_level(self):

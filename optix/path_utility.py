@@ -120,6 +120,7 @@ def get_local_optix_include_path():
     local_include_path = pathlib.Path(__file__).parent / "include"
     return str(local_include_path) if local_include_path.exists() else None
 
+
 def get_optix_include_path(environment_variable=None):
     optix_path = get_optix_path(environment_variable=environment_variable)
     if optix_path is None:

@@ -326,7 +326,7 @@ cdef class Module(OptixContextObject):
         cdef unsigned int pipeline_payload_values, i
         #cls._check_payload_values(module_compile_options, pipeline_compile_options)
 
-        ptx = cls.compile_cuda_ptx(src, compile_flags, name=program_name)
+        ptx = module.compile_cuda_ptx(src, compile_flags, name=program_name)
         c_ptx = ptx
 
         cdef Task task = Task(module)
@@ -381,8 +381,8 @@ cdef class Module(OptixContextObject):
     def get_default_nvrtc_compile_flags(std=None, rdc=False):
         return get_default_nvrtc_compile_flags(std, rdc)
 
-    @staticmethod
-    def compile_cuda_ptx(src, compile_flags=_nvrtc_compile_flags_default, name=None, **kwargs):
+
+    def compile_cuda_ptx(self, src, compile_flags=_nvrtc_compile_flags_default, name=None, **kwargs):
         """
         Compiles a valid source module into the ptx format. Accepts files containing either source code, ptx, or
         optix-ir code, compiles the source code if necessary and returns valid ptx or optix-ir modules.
@@ -424,9 +424,14 @@ cdef class Module(OptixContextObject):
             cuda_include_path = get_cuda_include_path()
             optix_include_path = get_local_optix_include_path()
             if not os.path.exists(optix_include_path):
-                warnings.warn("Local optix not found. This usually indicates some installation issue. Attempting"
-                              " to load the global optix includes instead.", RuntimeWarning)
+                # attempt to load the global path if the local path is not available
                 optix_include_path = get_optix_include_path()
+            if optix_include_path is None:
+                raise ValueError("Unable to locate the optix headers. Make sure that either the OPTIX_PATH environement variable is set"
+                                 "correctly or the optix headers are embedded into this package.")
+            if <Module>self.context.log_callback is not None:
+                # hook into the logging system for this output
+                <Module>self.context.log_callback(4, "build", f"Using optix include path: {optix_include_path}")
             flags.extend([f'-I{cuda_include_path}', f'-I{optix_include_path}'])
             ptx, _ = prog.compile(flags)
             return ptx
