@@ -10,6 +10,7 @@ log = logging.getLogger()
 script_dir = os.path.dirname(__file__)
 cuda_src = os.path.join(script_dir, "cuda", "hello.cu")
 
+
 def create_module(ctx, pipeline_opts):
     compile_opts = ox.ModuleCompileOptions(debug_level=ox.CompileDebugLevel.FULL, opt_level=ox.CompileOptimizationLevel.LEVEL_0)
     module = ox.Module(ctx, cuda_src, compile_opts, pipeline_opts)

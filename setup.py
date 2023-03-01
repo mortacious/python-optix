@@ -30,14 +30,16 @@ def import_module_from_path(path):
 
 
 util = import_module_from_path('optix/path_utility.py')
-cuda_include_path = util.get_cuda_include_path()
-optix_include_path = util.get_optix_include_path()
+cuda_include_path = util.get_cuda_include_path(environment_variable='CUDA_PATH')
+optix_include_path = util.get_optix_include_path(environement_variable='OPTIX_PATH')
 print("Found cuda includes at", cuda_include_path)
 print("Found optix includes at", optix_include_path)
 if cuda_include_path is None:
-    raise RuntimeError("CUDA not found in the system, but is required to build this package.")
+    raise RuntimeError("CUDA not found in the system, but is required to build this package. Consider setting"
+                       "CUDA_PATH to the location of the local cuda toolkit installation.")
 if optix_include_path is None:
-    raise RuntimeError("OptiX not found in the system, but is required to build this package.")
+    raise RuntimeError("OptiX not found in the system, but is required to build this package. Consider setting "
+                       "OPTIX_PATH to the location of the optix SDK.")
 
 optix_version_re = re.compile(r'.*OPTIX_VERSION +(\d{5})')  # get the optix version from the header
 with open(Path(optix_include_path) / "optix.h", 'r') as f:
@@ -75,33 +77,59 @@ version = import_module_from_path('optix/_version.py').__version__
 
 package_data = {}
 
-try:
-    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
 
-    def glob_fix(package_name, glob):
-        # this assumes setup.py lives in the folder that contains the package
-        package_path = Path(f'./{package_name}').resolve()
-        return [str(path.relative_to(package_path)) 
-                for path in package_path.glob(glob)]
+def glob_fix(package_name, glob):
+    # this assumes setup.py lives in the folder that contains the package
+    package_path = Path(f'./{package_name}').resolve()
+    return [str(path.relative_to(package_path))
+            for path in package_path.glob(glob)]
 
+from setuptools.command.install import install as _install
+from setuptools.command.develop import develop as _develop
 
-    class custom_bdist_wheel(_bdist_wheel):
-        def finalize_options(self):
-            _bdist_wheel.finalize_options(self)
+class EmbeddHeadersCommandMixin:
+    def update_package_data(self):
+        self.distribution.package_data.update({
+            'optix': [*glob_fix('optix', 'include/**/*')]
+        })
+        print("embedding optix headers into package data",
+              self.distribution.package_data)
 
+    def run(self):
+        embedd = os.getenv("OPTIX_EMBED_HEADERS")
+        if embedd:
             # create the path for the internal headers
-            # due to optix license restrictions those headers 
+            # due to optix license restrictions those headers
             # cannot be distributed on pypi directly so we will add this headers dynamically
             # upon wheel construction to install them alongside the package
 
             if not os.path.exists('optix/include/optix.h'):
-                shutil.copytree(optix_include_path, 'optix/include')    
-            self.distribution.package_data.update({
-                'optix': [*glob_fix('optix', 'include/**/*')]
-            })
+                shutil.copytree(optix_include_path, 'optix/include')
 
+            self.update_package_data()
+
+        super().run()
+
+
+class CustomInstallCommand(EmbeddHeadersCommandMixin, _install):
+    pass
+
+
+class CustomDevelopCommand(EmbeddHeadersCommandMixin, _develop):
+    pass
+
+
+cmd_classes = {'install': CustomInstallCommand,
+               'develop': CustomDevelopCommand}
+
+try:
+    from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
+
+    class CustomBdistWheelCommand(EmbeddHeadersCommandMixin, _bdist_wheel):
+        pass
+    cmd_classes['bdist_wheel'] = CustomBdistWheelCommand
 except ImportError:
-    custom_bdist_wheel = None
+    CustomBdistWheel = None
 
 setup(
     name="python-optix",
@@ -142,5 +170,5 @@ setup(
     python_requires=">=3.8",
     package_data=package_data,
     zip_safe=False,
-    cmdclass={'bdist_wheel': custom_bdist_wheel}
+    cmdclass=cmd_classes
 )
