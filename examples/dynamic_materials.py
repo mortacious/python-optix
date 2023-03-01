@@ -38,7 +38,9 @@ class Params:
 
     def __getattribute__(self, name):
         if name in Params._params.keys():
-            return self.__dict__['handle'][name]
+            item = self.__dict__['handle'][name]
+            if isinstance(item, np.ndarray) and item.shape in ((0,), (1,)):
+                return item.item()
         else:
             return super().__getattribute__(name)
 

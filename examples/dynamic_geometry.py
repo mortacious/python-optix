@@ -51,7 +51,9 @@ class Params:
 
     def __getattribute__(self, name):
         if name in Params._params.keys():
-            return self.__dict__['handle'][name]
+            item = self.__dict__['handle'][name]
+            if isinstance(item, np.ndarray) and item.shape in ((0,), (1,)):
+                return item.item()
         else:
             return super().__getattribute__(name)
 
@@ -482,7 +484,7 @@ if __name__ == '__main__':
 
         glfw.swap_buffers(window)
 
-        state.params.subframe_index = state.params.subframe_index.item() + 1
+        state.params.subframe_index = state.params.subframe_index+ 1
 
     impl.shutdown()
     glfw.terminate()
