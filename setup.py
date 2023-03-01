@@ -30,14 +30,16 @@ def import_module_from_path(path):
 
 
 util = import_module_from_path('optix/path_utility.py')
-cuda_include_path = util.get_cuda_include_path()
-optix_include_path = util.get_optix_include_path()
+cuda_include_path = util.get_cuda_include_path(environment_variable='CUDA_PATH')
+optix_include_path = util.get_optix_include_path(environement_variable='OPTIX_PATH')
 print("Found cuda includes at", cuda_include_path)
 print("Found optix includes at", optix_include_path)
 if cuda_include_path is None:
-    raise RuntimeError("CUDA not found in the system, but is required to build this package.")
+    raise RuntimeError("CUDA not found in the system, but is required to build this package. Consider setting"
+                       "CUDA_PATH to the location of the local cuda toolkit installation.")
 if optix_include_path is None:
-    raise RuntimeError("OptiX not found in the system, but is required to build this package.")
+    raise RuntimeError("OptiX not found in the system, but is required to build this package. Consider setting "
+                       "OPTIX_PATH to the location of the optix SDK.")
 
 optix_version_re = re.compile(r'.*OPTIX_VERSION +(\d{5})')  # get the optix version from the header
 with open(Path(optix_include_path) / "optix.h", 'r') as f:
@@ -83,7 +85,7 @@ def glob_fix(package_name, glob):
             for path in package_path.glob(glob)]
 
 from setuptools.command.install import install as _install
-
+from setuptools.command.develop import develop as _develop
 
 class EmbeddHeadersCommandMixin:
     def update_package_data(self):
@@ -94,7 +96,7 @@ class EmbeddHeadersCommandMixin:
               self.distribution.package_data)
 
     def run(self):
-        embedd = os.getenv("OPTIX_ADD_HEADERS")
+        embedd = os.getenv("OPTIX_EMBED_HEADERS")
         if embedd:
             # create the path for the internal headers
             # due to optix license restrictions those headers
@@ -106,7 +108,6 @@ class EmbeddHeadersCommandMixin:
 
             self.update_package_data()
 
-
         super().run()
 
 
@@ -114,7 +115,12 @@ class CustomInstallCommand(EmbeddHeadersCommandMixin, _install):
     pass
 
 
-cmd_classes = {'install': CustomInstallCommand}
+class CustomDevelopCommand(EmbeddHeadersCommandMixin, _develop):
+    pass
+
+
+cmd_classes = {'install': CustomInstallCommand,
+               'develop': CustomDevelopCommand}
 
 try:
     from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
