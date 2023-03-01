@@ -31,7 +31,7 @@ def import_module_from_path(path):
 
 util = import_module_from_path('optix/path_utility.py')
 cuda_include_path = util.get_cuda_include_path(environment_variable='CUDA_PATH')
-optix_include_path = util.get_optix_include_path(environement_variable='OPTIX_PATH')
+optix_include_path = util.get_optix_include_path(environment_variable='OPTIX_PATH')
 print("Found cuda includes at", cuda_include_path)
 print("Found optix includes at", optix_include_path)
 if cuda_include_path is None:
