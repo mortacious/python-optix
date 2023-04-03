@@ -423,7 +423,7 @@ cdef class Module(OptixContextObject):
             # get cuda and optix_include_paths
             cuda_include_path = get_cuda_include_path()
             optix_include_path = get_local_optix_include_path()
-            if not os.path.exists(optix_include_path):
+            if optix_include_path is None or not os.path.exists(optix_include_path):
                 # attempt to load the global path if the local path is not available
                 optix_include_path = get_optix_include_path()
             if optix_include_path is None:
