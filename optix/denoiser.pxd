@@ -191,6 +191,9 @@ cdef class Denoiser(OptixContextObject):
     cdef size_t _state_size
     cdef object _d_scratch
     cdef size_t _scratch_size
+    cdef size_t _guide_layer_scratch_size
+    cdef size_t _intensity_scratch_size
+    cdef size_t _average_color_scratch_size
     cdef object _d_window
     cdef size_t _window_size
     cdef object _d_intensity
