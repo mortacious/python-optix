@@ -59,10 +59,10 @@ if __name__ == "__main__":
     ret = cp.asnumpy(ret)
 
     fig, axs = plt.subplots(nrows=2, sharex=True, sharey=True)
-    axs[0].imshow(np.clip(color_image, 0, 255).astype(np.uint8))
+    axs[0].imshow(np.clip(color_image, 0, 1).astype(np.float32))
     axs[0].set_title("original")
 
-    ret = np.clip(ret, 0, 255).astype(np.uint8)
+    ret = np.clip(ret, 0, 1).astype(np.float32)
     axs[1].imshow(ret)
     axs[1].set_title("denoised")
     plt.show()
