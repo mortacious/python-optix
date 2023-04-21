@@ -6,7 +6,8 @@ from pathlib import Path
 import shutil
 import numpy
 
-OPTIX_COMPATIBLE_VERSION = (7, 6)
+OPTIX_COMPATIBLE_VERSION = (7, 7)
+
 
 # standalone import of a module (https://stackoverflow.com/a/58423785)
 def import_module_from_path(path):
@@ -86,6 +87,7 @@ def glob_fix(package_name, glob):
 
 from setuptools.command.install import install as _install
 from setuptools.command.develop import develop as _develop
+
 
 class EmbeddHeadersCommandMixin:
     def update_package_data(self):
