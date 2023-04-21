@@ -42,9 +42,11 @@ cdef extern from "optix_includes.h" nogil:
 
 
     cdef enum OptixPixelFormat:
+        OPTIX_PIXEL_FORMAT_HALF1
         OPTIX_PIXEL_FORMAT_HALF2
         OPTIX_PIXEL_FORMAT_HALF3
         OPTIX_PIXEL_FORMAT_HALF4
+        OPTIX_PIXEL_FORMAT_FLOAT1
         OPTIX_PIXEL_FORMAT_FLOAT2
         OPTIX_PIXEL_FORMAT_FLOAT3
         OPTIX_PIXEL_FORMAT_FLOAT4
@@ -59,10 +61,19 @@ cdef extern from "optix_includes.h" nogil:
         unsigned int pixelStrideInBytes
         OptixPixelFormat format
 
+    cdef enum OptixDenoiserAOVType:
+        OPTIX_DENOISER_AOV_TYPE_NONE
+        OPTIX_DENOISER_AOV_TYPE_BEAUTY
+        OPTIX_DENOISER_AOV_TYPE_SPECULAR
+        OPTIX_DENOISER_AOV_TYPE_REFLECTION
+        OPTIX_DENOISER_AOV_TYPE_REFRACTION
+        OPTIX_DENOISER_AOV_TYPE_DIFFUSE
+
     cdef struct OptixDenoiserLayer:
         OptixImage2D input
         OptixImage2D previousOutput
         OptixImage2D output
+        OptixDenoiserAOVType type
 
     cdef struct OptixDenoiserGuideLayer:
         OptixImage2D albedo
@@ -70,6 +81,7 @@ cdef extern from "optix_includes.h" nogil:
         OptixImage2D flow
         OptixImage2D previousOutputInternalGuideLayer
         OptixImage2D outputInternalGuideLayer
+        OptixImage2D flowTrustworthiness
 
     ctypedef struct OptixDenoiser:
         pass

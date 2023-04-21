@@ -54,7 +54,6 @@ cdef extern from "optix_includes.h" nogil:
 
     cdef struct OptixPipelineLinkOptions:
         unsigned int maxTraceDepth
-        OptixCompileDebugLevel debugLevel # OptixCompileDebugLevel
 
 
     ctypedef struct OptixProgramGroup:

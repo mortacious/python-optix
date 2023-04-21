@@ -59,7 +59,9 @@ class PrimitiveType(IntEnum):
     ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE,
     ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR
     ROUND_CATMULLROM = OPTIX_PRIMITIVE_TYPE_ROUND_CATMULLROM
+    FLAT_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAT_QUADRATIC_BSPLINE
     SPHERE = OPTIX_PRIMITIVE_TYPE_SPHERE
+    ROUND_CUBIC_BEZIER = OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BEZIER
     TRIANGLE = OPTIX_PRIMITIVE_TYPE_TRIANGLE
 
 
@@ -849,6 +851,7 @@ cdef class AccelerationStructure(OptixContextObject):
                  random_instance_access=False,
                  allow_opacity_micromap_update=False,
                  allow_disable_opacity_micromaps=False,
+
                  stream=None):
 
         super().__init__(context)
@@ -900,7 +903,11 @@ cdef class AccelerationStructure(OptixContextObject):
             (<BuildInputArray>build_input).prepare_build_input(&ret[i])
 
 
-    cdef void _init_accel_options(self, size_t num_build_inputs, unsigned int build_flags, OptixBuildOperation operation, vector[OptixAccelBuildOptions]& ret):
+    cdef void _init_accel_options(self,
+                                  size_t num_build_inputs,
+                                  unsigned int build_flags,
+                                  OptixBuildOperation operation,
+                                  vector[OptixAccelBuildOptions]& ret):
         cdef OptixAccelBuildOptions accel_option
         memset(&accel_option, 0, sizeof(OptixAccelBuildOptions)) # init struct to 0
 
@@ -935,7 +942,10 @@ cdef class AccelerationStructure(OptixContextObject):
             self._relocate_deps.append(relocation_dep)
 
         cdef vector[OptixAccelBuildOptions] accel_options# = vector[OptixAccelBuildOptions](inputs_size)
-        self._init_accel_options(inputs_size, self._build_flags, OPTIX_BUILD_OPERATION_BUILD, accel_options)
+        self._init_accel_options(inputs_size,
+                                 self._build_flags,
+                                 OPTIX_BUILD_OPERATION_BUILD,
+                                 accel_options)
 
         cdef OptixAccelEmitDesc compacted_size_property
 
@@ -1153,6 +1163,49 @@ cdef class AccelerationStructure(OptixContextObject):
             dep.finalize_relocation_input()
 
         return result
+
+
+    def aabbs(self, stream: typ.Optional[cp.cuda.Stream] = None) -> cp.ndarray:
+        cdef OptixAccelEmitDesc c_property
+        cdef uintptr_t c_stream = 0
+
+        if stream is not None:
+            c_stream = stream.ptr
+
+        # no motion support yet, so only a single aabb is returned here
+        d_buffer = cp.zeros(6, dtype=np.float32)
+
+        c_property.type = OPTIX_PROPERTY_TYPE_AABBS
+        c_property.result = d_buffer.data.ptr
+
+        optix_check_return(optixAccelEmitProperty(self.context.c_context,
+                                                  c_stream,
+                                                  <OptixTraversableHandle>self._handle,
+                                                  &c_property))
+
+        return d_buffer
+
+
+    def compacted_size(self, stream: typ.Optional[cp.cuda.Stream] = None) -> int:
+        cdef OptixAccelEmitDesc c_property
+        cdef uintptr_t c_stream = 0
+
+        if stream is not None:
+            c_stream = stream.ptr
+
+        # no motion support yet, so only a single aabb is returned here
+        d_buffer = cp.zeros(1, dtype=np.uint64)
+
+        c_property.type = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE
+        c_property.result = d_buffer.data.ptr
+
+        optix_check_return(optixAccelEmitProperty(self.context.c_context,
+                                                  c_stream,
+                                                  <OptixTraversableHandle>self._handle,
+                                                  &c_property))
+
+        return d_buffer[0]
+
 
     @property
     def handle(self):

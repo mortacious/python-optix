@@ -164,9 +164,8 @@ cdef class PipelineLinkOptions(OptixObject):
     """
     Class wrapping the OptixPipelineLinkOptions struct.
     """
-    def __init__(self, unsigned int max_trace_depth = 1, debug_level = CompileDebugLevel.DEFAULT):
+    def __init__(self, unsigned int max_trace_depth = 1):
         self.link_options.maxTraceDepth = max_trace_depth
-        self.link_options.debugLevel = debug_level.value
 
     @property
     def max_trace_depth(self):
@@ -175,14 +174,6 @@ cdef class PipelineLinkOptions(OptixObject):
     @max_trace_depth.setter
     def max_trace_depth(self, unsigned int max_trace_depth):
         self.link_options.maxTraceDepth = max_trace_depth
-
-    @property
-    def debug_level(self):
-        return CompileDebugLevel(self.link_options.debugLevel)
-
-    @debug_level.setter
-    def debug_level(self, debug_level):
-        self.link_options.debugLevel = debug_level.value
 
 
 ctypedef vector[unsigned int] uint_vector

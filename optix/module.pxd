@@ -72,14 +72,14 @@ cdef extern from "optix_includes.h" nogil:
         unsigned int curveEndcapFlags
 
 
-    OptixResult optixModuleCreateFromPTX(OptixDeviceContext context,
-                                         const OptixModuleCompileOptions *moduleCompileOptions,
-                                         const OptixPipelineCompileOptions *pipelineCompileOptions,
-                                         const char *PTX,
-                                         size_t PTXsize,
-                                         char *logString,
-                                         size_t *logStringSize,
-                                         OptixModule *module)
+    OptixResult optixModuleCreate(OptixDeviceContext context,
+                                  const OptixModuleCompileOptions *moduleCompileOptions,
+                                  const OptixPipelineCompileOptions *pipelineCompileOptions,
+                                  const char *input,
+                                  size_t inputSize,
+                                  char *logString,
+                                  size_t *logStringSize,
+                                  OptixModule *module)
 
 
     cdef OptixResult optixModuleDestroy(OptixModule module)
@@ -105,11 +105,11 @@ cdef extern from "optix_includes.h" nogil:
     cdef OptixResult optixModuleGetCompilationState(OptixModule module,
                                                     OptixModuleCompileState * state)
 
-    cdef OptixResult optixModuleCreateFromPTXWithTasks(OptixDeviceContext context,
+    cdef OptixResult optixModuleCreateWithTasks(OptixDeviceContext context,
                                                        const OptixModuleCompileOptions * moduleCompileOptions,
                                                        const OptixPipelineCompileOptions * pipelineCompileOptions,
-                                                       const char * PTX,
-                                                       size_t PTXsize,
+                                                       const char * input,
+                                                       size_t inputSize,
                                                        char * logString,
                                                        size_t * logStringSize,
                                                        OptixModule * module,

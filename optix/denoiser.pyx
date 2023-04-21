@@ -8,7 +8,7 @@ import numpy as np
 from enum import IntEnum
 from libcpp.vector cimport vector
 from .common import ensure_iterable
-from typing import Optional
+import typing as typ
 
 optix_init()
 
@@ -21,6 +21,15 @@ class DenoiserAlphaMode(enum.IntEnum):
     COPY = OPTIX_DENOISER_ALPHA_MODE_COPY
     ALPHA_AS_AOV = OPTIX_DENOISER_ALPHA_MODE_ALPHA_AS_AOV
     FULL_DENOISE_PASS = OPTIX_DENOISER_ALPHA_MODE_FULL_DENOISE_PASS
+
+
+class DenoiserAOVType(enum.IntEnum):
+    NONE = OPTIX_DENOISER_AOV_TYPE_NONE
+    BEAUTY = OPTIX_DENOISER_AOV_TYPE_BEAUTY
+    SPECULAR = OPTIX_DENOISER_AOV_TYPE_SPECULAR
+    REFLECTION = OPTIX_DENOISER_AOV_TYPE_REFLECTION
+    REFRACTION = OPTIX_DENOISER_AOV_TYPE_REFRACTION
+    DIFFUSE = OPTIX_DENOISER_AOV_TYPE_DIFFUSE
 
 
 class DenoiserModelKind(IntEnum):
@@ -42,9 +51,11 @@ class DenoiserModelKind(IntEnum):
 
 
 class PixelFormat(IntEnum):
+    HALF1 = OPTIX_PIXEL_FORMAT_HALF1
     HALF2 = OPTIX_PIXEL_FORMAT_HALF2
     HALF3 = OPTIX_PIXEL_FORMAT_HALF3
     HALF4 = OPTIX_PIXEL_FORMAT_HALF4
+    FLOAT1 = OPTIX_PIXEL_FORMAT_FLOAT1
     FLOAT2 = OPTIX_PIXEL_FORMAT_FLOAT2
     FLOAT3 = OPTIX_PIXEL_FORMAT_FLOAT3
     FLOAT4 = OPTIX_PIXEL_FORMAT_FLOAT4
@@ -61,9 +72,11 @@ class PixelFormat(IntEnum):
         return _pixeltype_to_dtype[self]
 
 _dtype_to_pixeltype = {
+    (np.dtype(np.float16), 1): PixelFormat.HALF1,
     (np.dtype(np.float16), 2): PixelFormat.HALF2,
     (np.dtype(np.float16), 3): PixelFormat.HALF3,
     (np.dtype(np.float16), 4): PixelFormat.HALF4,
+    (np.dtype(np.float32), 1): PixelFormat.FLOAT1,
     (np.dtype(np.float32), 2): PixelFormat.FLOAT2,
     (np.dtype(np.float32), 3): PixelFormat.FLOAT3,
     (np.dtype(np.float32), 4): PixelFormat.FLOAT4,
@@ -231,11 +244,13 @@ cdef class Denoiser(OptixContextObject):
                albedo=None,
                normals=None,
                flow=None,
+               flow_trustworthiness=None,
                outputs=None,
+               aov_types: typ.Optional[typ.Union[typ.Sequence[DenoiserAOVType], DenoiserAOVType]] = None,
                denoise_alpha: DenoiserAlphaMode = DenoiserAlphaMode.COPY,
-               blend_factor=0.0,
-               stream=None,
-               temporal_use_previous_layer=False):
+               blend_factor: float = 0.0,
+               stream: typ.Optional[cp.cuda.Stream] = None,
+               temporal_use_previous_layer: bool = False):
 
         accepted_input_types = (PixelFormat.FLOAT3, PixelFormat.FLOAT3, PixelFormat.HALF3, PixelFormat.HALF4)
         inputs = [Image2D(inp, require_type=accepted_input_types) for inp in ensure_iterable(inputs)]
@@ -272,6 +287,10 @@ cdef class Denoiser(OptixContextObject):
 
             prev_outputs = [inputs[i] if prev is None else Image2D(prev, require_type=accepted_input_types) for i, prev in enumerate(prev_outputs)]
 
+            if flow_trustworthiness is not None:
+                flow_trustworthiness = Image2D(flow_trustworthiness, require_type=(PixelFormat.HALF1, PixelFormat.FLOAT1))
+                guide_layer.flowTrustworthiness = <Image2D>flow_trustworthiness.image
+
         # prepare the outputs
         if outputs is not None:
             outputs = ensure_iterable(outputs)
@@ -281,6 +300,15 @@ cdef class Denoiser(OptixContextObject):
         else:
             outputs = [Image2D.empty(input_size, inp.pixel_format) for inp in inputs]
 
+        # prepare the aov types
+        if aov_types is not None:
+            aov_types = ensure_iterable(aov_types)
+            if len(aov_types) == 1:
+                aov_types = aov_types * len(inputs)
+            elif len(aov_types) != len(inputs):
+                raise ValueError("aov_types must be either None, a scalar or a list of len(inputs).")
+        else:
+            aov_types = [DenoiserAOVType.NONE] * len(inputs)
 
         # prepare the layers
         cdef vector[OptixDenoiserLayer] layers
@@ -289,6 +317,7 @@ cdef class Denoiser(OptixContextObject):
         for i in range(len(inputs)):
             layers[i].input = (<Image2D>inputs[i]).image
             layers[i].output = (<Image2D>outputs[i]).image
+            layers[i].type = aov_types[i].value
 
             if temporal_mode:
                 layers[i].previousOutput = (<Image2D>prev_outputs[i]).image

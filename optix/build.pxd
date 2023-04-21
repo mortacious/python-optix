@@ -84,7 +84,9 @@ cdef extern from "optix.h" nogil:
         OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE,
         OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR,
         OPTIX_PRIMITIVE_TYPE_ROUND_CATMULLROM,
+        OPTIX_PRIMITIVE_TYPE_FLAT_QUADRATIC_BSPLINE,
         OPTIX_PRIMITIVE_TYPE_SPHERE,
+        OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BEZIER,
         OPTIX_PRIMITIVE_TYPE_TRIANGLE,
 
 
@@ -312,6 +314,12 @@ cdef extern from "optix.h" nogil:
                                            OptixTraversableHandle * traversableHandle
                                            )
 
+    OptixResult optixAccelEmitProperty (OptixDeviceContext context,
+                                        CUstream stream,
+                                        OptixTraversableHandle handle,
+                                        const OptixAccelEmitDesc * emittedProperty
+                                        )
+
 
 cdef class BuildInputArray(OptixObject):
     cdef OptixBuildInputType build_input_type
@@ -370,6 +378,8 @@ cdef class BuildInputInstanceArray(BuildInputArray):
     cdef object instances
     cdef object _d_instances
 
+cdef class MotionOptions(OptixObject):
+    cdef OptixMotionOptions options
 
 cdef class AccelerationStructure(OptixContextObject):
     cdef unsigned int _build_flags

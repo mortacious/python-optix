@@ -61,8 +61,12 @@ cdef extern from "optix_includes.h" nogil:
     cdef struct OptixProgramGroupOptions:
         pass
 
+    ctypedef struct OptixPipeline:
+        pass
 
-    OptixResult optixProgramGroupGetStackSize(OptixProgramGroup programGroup, OptixStackSizes* stackSizes)
+    OptixResult optixProgramGroupGetStackSize(OptixProgramGroup programGroup,
+                                              OptixStackSizes* stackSizes,
+                                              OptixPipeline  pipeline)
 
     OptixResult optixProgramGroupCreate(OptixDeviceContext context,
                                         const OptixProgramGroupDesc* programDescriptions,

@@ -3,8 +3,11 @@
 from .common cimport optix_check_return, optix_init
 from .context cimport DeviceContext
 from .module cimport Module
+from .pipeline import Pipeline
 from libc.string cimport memset
 from enum import IntEnum
+import typing as typ
+
 optix_init()
 
 __all__ = ['ProgramGroup', 'ProgramGroupKind']
@@ -332,11 +335,15 @@ cdef class ProgramGroup(OptixContextObject):
                    hitgroup_module_IS=module_IS,
                    hitgroup_entry_function_name_IS=entry_function_IS)
 
-    @property
-    def stack_sizes(self):
+    def stack_sizes(self, pipeline: typ.Optional[Pipeline] = None):
         """
         Returns the stack sizes of this ProgramGroup
 
+        Parameters
+        ----------
+        pipeline: Optional associated pipeline object for more accurate results. When not set,
+                  the stack size will be calculated excluding external functions.
+                  In this case a warning will be issued if external functions are referenced by the Module.
         Returns
         -------
         cssRG: int
@@ -355,7 +362,11 @@ cdef class ProgramGroup(OptixContextObject):
             Direct stack size of direct callables (DC) programs in bytes.
         """
         cdef OptixStackSizes stack_sizes
-        optix_check_return(optixProgramGroupGetStackSize(self.program_group, &stack_sizes))
+        cdef OptixPipeline c_pipeline = NULL
+        if pipeline is not None:
+            c_pipeline = pipeline.pipeline
+
+        optix_check_return(optixProgramGroupGetStackSize(self.program_group, &stack_sizes, c_pipeline))
         return stack_sizes.cssRG, stack_sizes.cssMS, stack_sizes.cssCH, stack_sizes.cssAH, stack_sizes.cssIS, stack_sizes.cssCC, stack_sizes.dssDC
 
     def _repr_details(self):
