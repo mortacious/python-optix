@@ -42,7 +42,10 @@
 #    accurate evaluation of the opacity function.
 #  * Regions of the micromap which are unknown are tinted a lighter color to
 #    visualize the regions which required anyhit evaluation.
-# 
+#
+#  This example reimplements the optixOpacityMicromap-example from the SDK and
+#  should provide the same results.
+#
 # -----------------------------------------------------------------------------
 
 
