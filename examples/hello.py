@@ -24,7 +24,7 @@ def create_program_groups(ctx, module):
 
 
 def create_pipeline(ctx, program_grps, pipeline_options):
-    link_opts = ox.PipelineLinkOptions(max_trace_depth=0, debug_level=ox.CompileDebugLevel.FULL)
+    link_opts = ox.PipelineLinkOptions(max_trace_depth=0)
 
     pipeline = ox.Pipeline(ctx, compile_options=pipeline_options, link_options=link_opts,
             program_groups=program_grps, max_traversable_graph_depth=1)

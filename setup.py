@@ -11,7 +11,7 @@ OPTIX_COMPATIBLE_VERSION = (7, 7)
 
 # standalone import of a module (https://stackoverflow.com/a/58423785)
 def import_module_from_path(path):
-    """Import a module from the given path without executing any code above it
+    """Import a module from the given path without executing any code from the hierarchy above it
     """
     import importlib
     import pathlib
@@ -85,6 +85,7 @@ def glob_fix(package_name, glob):
     return [str(path.relative_to(package_path))
             for path in package_path.glob(glob)]
 
+
 from setuptools.command.install import install as _install
 from setuptools.command.develop import develop as _develop
 
@@ -149,7 +150,7 @@ setup(
     ext_modules=extensions,
     install_requires=[
         'numpy',
-        'cupy>=9.0'
+        'cupy>=11.0'
     ],
     license="MIT",
     classifiers=[

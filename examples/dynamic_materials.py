@@ -228,8 +228,7 @@ def create_program_groups(state):
 def create_pipeline(state):
     program_grps = [state.raygen_grp, state.miss_grp] + state.hit_grps
 
-    link_opts = ox.PipelineLinkOptions(max_trace_depth=1,
-                                       debug_level=ox.CompileDebugLevel.FULL)
+    link_opts = ox.PipelineLinkOptions(max_trace_depth=1)
 
     pipeline = ox.Pipeline(state.ctx,
                            compile_options=state.pipeline_opts,

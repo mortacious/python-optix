@@ -1028,7 +1028,7 @@ cdef class AccelerationStructure(OptixContextObject):
 
         cdef size_t inputs_size = len(build_inputs)
 
-        if inputs_size != len(self._relocate_deps):
+        if inputs_size != <size_t>len(self._relocate_deps):
             raise ValueError("Number of build inputs given to update() must be the same as the one used to build this GAS")
         cdef vector[OptixBuildInput] inputs #= vector[OptixBuildInput](inputs_size)
         self._init_build_inputs(build_inputs, inputs)
@@ -1179,7 +1179,7 @@ cdef class AccelerationStructure(OptixContextObject):
         c_property.result = d_buffer.data.ptr
 
         optix_check_return(optixAccelEmitProperty(self.context.c_context,
-                                                  c_stream,
+                                                  <CUstream>c_stream,
                                                   <OptixTraversableHandle>self._handle,
                                                   &c_property))
 
@@ -1200,7 +1200,7 @@ cdef class AccelerationStructure(OptixContextObject):
         c_property.result = d_buffer.data.ptr
 
         optix_check_return(optixAccelEmitProperty(self.context.c_context,
-                                                  c_stream,
+                                                  <CUstream>c_stream,
                                                   <OptixTraversableHandle>self._handle,
                                                   &c_property))
 

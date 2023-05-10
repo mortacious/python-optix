@@ -3,7 +3,7 @@
 from .common cimport optix_check_return, optix_init
 from .context cimport DeviceContext
 from .module cimport Module
-from .pipeline import Pipeline
+from .pipeline cimport Pipeline
 from libc.string cimport memset
 from enum import IntEnum
 import typing as typ
@@ -335,7 +335,7 @@ cdef class ProgramGroup(OptixContextObject):
                    hitgroup_module_IS=module_IS,
                    hitgroup_entry_function_name_IS=entry_function_IS)
 
-    def stack_sizes(self, pipeline: typ.Optional[Pipeline] = None):
+    def stack_sizes(self, pipeline: typ.Optional[Pipeline] = None) -> typ.Tuple[int, int, int, int, int, int, int]:
         """
         Returns the stack sizes of this ProgramGroup
 
@@ -362,9 +362,9 @@ cdef class ProgramGroup(OptixContextObject):
             Direct stack size of direct callables (DC) programs in bytes.
         """
         cdef OptixStackSizes stack_sizes
-        cdef OptixPipeline c_pipeline = NULL
+        cdef OptixPipeline c_pipeline = <OptixPipeline>NULL
         if pipeline is not None:
-            c_pipeline = pipeline.pipeline
+            c_pipeline = <OptixPipeline>(<Pipeline>pipeline).pipeline
 
         optix_check_return(optixProgramGroupGetStackSize(self.program_group, &stack_sizes, c_pipeline))
         return stack_sizes.cssRG, stack_sizes.cssMS, stack_sizes.cssCH, stack_sizes.cssAH, stack_sizes.cssIS, stack_sizes.cssCC, stack_sizes.dssDC

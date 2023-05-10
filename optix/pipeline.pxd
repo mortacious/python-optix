@@ -93,7 +93,8 @@ cdef extern from "optix_includes.h" nogil:
 
 cdef extern from "optix_stack_size.h" nogil:
     OptixResult optixUtilAccumulateStackSizes(OptixProgramGroup programGroup,
-                                                  OptixStackSizes* stackSizes)
+                                              OptixStackSizes* stackSizes,
+                                              OptixPipeline pipeline)
 
 
     OptixResult optixUtilComputeStackSizes(const OptixStackSizes* stackSizes,
@@ -135,7 +136,8 @@ cdef extern from "optix_stack_size.h" nogil:
                                                            unsigned int programGroupCH2Count,
                                                            unsigned int* directCallableStackSizeFromTraversal,
                                                            unsigned int* directCallableStackSizeFromState,
-                                                           unsigned int* continuationStackSize
+                                                           unsigned int* continuationStackSize,
+                                                           OptixPipeline pipeline
                                                            )
 
 cdef class PipelineCompileOptions(OptixObject):

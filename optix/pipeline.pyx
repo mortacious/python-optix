@@ -217,7 +217,7 @@ cdef class Pipeline(OptixContextObject):
             c_program_groups[i] = grp.program_group
 
         for i in range(len(program_groups)):
-            optix_check_return(optixUtilAccumulateStackSizes(c_program_groups[i], &self._stack_sizes))
+            optix_check_return(optixUtilAccumulateStackSizes(c_program_groups[i], &self._stack_sizes, <OptixPipeline>NULL))
         optix_check_return(optixPipelineCreate(self.context.c_context,
                                                &compile_options.compile_options,
                                                &link_options.link_options,
@@ -383,7 +383,8 @@ cdef class Pipeline(OptixContextObject):
                                                                           len(program_groups_closesthit_2),
                                                                           &direct_callable_stack_size_from_traversal,
                                                                           &direct_callable_stack_size_from_state,
-                                                                          &continuation_stack_size))
+                                                                          &continuation_stack_size,
+                                                                          self.pipeline))
             self.set_stack_sizes(direct_callable_stack_size_from_traversal, direct_callable_stack_size_from_state, continuation_stack_size)
         finally:
             for i in range(2):

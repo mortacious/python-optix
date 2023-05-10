@@ -253,7 +253,7 @@ cdef class Module(OptixContextObject):
         if src is not None:
             ptx = self.compile_cuda_ptx(src, compile_flags, name=program_name)
             c_ptx = ptx
-            optix_check_return(optixModuleCreateFromPTX(self.context.c_context,
+            optix_check_return(optixModuleCreate(self.context.c_context,
                                      &module_compile_options.compile_options,
                                      &pipeline_compile_options.compile_options,
                                      c_ptx,
@@ -331,7 +331,7 @@ cdef class Module(OptixContextObject):
 
         cdef Task task = Task(module)
 
-        optix_check_return(optixModuleCreateFromPTXWithTasks(context.c_context,
+        optix_check_return(optixModuleCreateWithTasks(context.c_context,
                                                              &module_compile_options.compile_options,
                                                              &pipeline_compile_options.compile_options,
                                                              c_ptx,
