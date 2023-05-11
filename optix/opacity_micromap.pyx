@@ -14,8 +14,8 @@ from libcpp cimport bool
 from libcpp.vector cimport vector
 from libc.string cimport memset
 from collections import defaultdict, namedtuple
-from collections.abc import Mapping, Sequence
-from enum import IntEnum, IntFlag
+from collections.abc import Sequence
+from enum import IntEnum
 import typing as typ
 from .common import ensure_iterable
 from .context cimport DeviceContext

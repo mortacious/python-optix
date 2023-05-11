@@ -16,7 +16,7 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 log = logging.getLogger()
 
-DEBUG=False
+DEBUG = False
 
 if DEBUG:
     exception_flags=ox.ExceptionFlags.DEBUG | ox.ExceptionFlags.TRACE_DEPTH | ox.ExceptionFlags.STACK_OVERFLOW,
@@ -179,17 +179,20 @@ def key_callback(window, key, scancode, action, mods):
         if key in {glfw.KEY_Q, glfw.KEY_ESCAPE}:
             glfw.set_window_should_close(window, True)
 
+
 def scroll_callback(window, xscroll, yscroll):
     state = glfw.get_window_user_pointer(window)
     if state.trackball.wheel_event(yscroll):
         state.camera_changed = True
 
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Helper functions
-#------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+
 def init_launch_params(state):
     state.params.frame_buffer = 0
     state.params.subframe_index = 0
+
 
 def handle_camera_update(state):
     if not state.camera_changed:
@@ -202,21 +205,23 @@ def handle_camera_update(state):
     camera.aspect_ratio = params.width / float(params.height)
     params.eye = camera.eye
 
-    u,v,w = camera.uvw_frame()
+    u, v, w = camera.uvw_frame()
     params.u = u
     params.v = v
     params.w = w
+
 
 def handle_resize(output_buffer, state):
     if not state.resize_dirty:
         return
     state.resize_dirty = False
-
     output_buffer.resize(state.params.width, state.params.height)
+
 
 def update_state(output_buffer, state):
     handle_camera_update(state)
     handle_resize(output_buffer, state)
+
 
 def launch_subframe(output_buffer, state):
     state.params.frame_buffer = output_buffer.map()

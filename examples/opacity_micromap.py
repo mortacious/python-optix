@@ -60,11 +60,20 @@ from PIL import Image, ImageOps
 script_dir = os.path.dirname(os.path.abspath(__file__))
 cuda_src = os.path.join(script_dir, "cuda", "opacity_micromap.cu")
 
-
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 log = logging.getLogger()
 
 DEBUG = False
+
+if DEBUG:
+    exception_flags = ox.ExceptionFlags.DEBUG | ox.ExceptionFlags.TRACE_DEPTH | ox.ExceptionFlags.STACK_OVERFLOW,
+    debug_level = ox.CompileDebugLevel.FULL
+    opt_level = ox.CompileOptimizationLevel.LEVEL_0
+else:
+    exception_flags = ox.ExceptionFlags.NONE
+    debug_level = ox.CompileDebugLevel.MINIMAL
+    opt_level = ox.CompileOptimizationLevel.LEVEL_3
+
 
 OMM_SUBDIV_LEVEL = 4
 NUM_TRIS         = 2

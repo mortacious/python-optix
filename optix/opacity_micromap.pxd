@@ -1,6 +1,5 @@
 from libc.stdint cimport uint32_t
 from libcpp.vector cimport vector
-from libcpp.pair cimport pair
 from .base cimport OptixObject
 from .common cimport OptixResult, CUstream, CUdeviceptr
 from .context cimport OptixDeviceContext, OptixContextObject
@@ -137,12 +136,6 @@ cdef extern from "optix.h" nogil:
                                            const OptixRelocationInfo * info,
                                            int * compatible
                                            )
-# cdef extern from "<functional>" namespace "std" nogil:
-#     cdef cppclass std_hash "hash"[T]:
-#         function() except +
-#         bint operator()(const T&) const
-
-
 
 cdef class OpacityMicromapInput(OptixObject):
     cdef object buffer
