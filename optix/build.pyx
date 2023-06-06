@@ -9,7 +9,7 @@ from libc.string cimport memcpy, memset
 from libcpp.vector cimport vector
 from .common import round_up, ensure_iterable
 import typing as typ
-from .micromap cimport BuildInputOpacityMicromap, OpacityMicromapArray
+from .opacity_micromap cimport BuildInputOpacityMicromap, OpacityMicromapArray
 
 optix_init()
 

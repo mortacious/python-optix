@@ -45,6 +45,11 @@ cdef extern from "optix.h" nogil:
         unsigned int subdivisionLevel
         OptixDisplacementMicromapFormat format
 
+    cdef struct OptixDisplacementMicromapDesc:
+        unsigned int byteOffset
+        unsigned short subdivisionLevel
+        unsigned short format
+
     cdef struct OptixDisplacementMicromapArrayBuildInput:
         OptixDisplacementMicromapFlags flags
         CUdeviceptr displacementValuesBuffer
@@ -53,26 +58,45 @@ cdef extern from "optix.h" nogil:
         unsigned int numDisplacementMicromapHistogramEntries
         const OptixDisplacementMicromapHistogramEntry* displacementMicromapHistogramEntries
 
+    cdef struct OptixMicromapBufferSizes:
+        size_t outputSizeInBytes
+        size_t tempSizeInBytes
+
+
+    cdef struct OptixMicromapBuffers:
+        CUdeviceptr output
+        size_t outputSizeInBytes
+        CUdeviceptr temp
+        size_t tempSizeInBytes
+
+    OptixResult optixDisplacementMicromapArrayComputeMemoryUsage(OptixDeviceContext context,
+                                                                 const OptixDisplacementMicromapArrayBuildInput* buildInput,
+                                                                 OptixMicromapBufferSizes* bufferSizes)
+
+    OptixResult optixDisplacementMicromapArrayBuild(OptixDeviceContext context,
+                                                    CUstream stream,
+                                                    const OptixDisplacementMicromapArrayBuildInput* buildInput,
+                                                    const OptixMicromapBuffers* buffers) 		
+
 cdef class DisplacedMicromapInput(OptixObject):
     cdef object buffer
     cdef OptixDisplacementMicromapFormat c_format
     cdef unsigned int c_subdivision_level
 
 
-cdef class OpacityMicromapArray(OptixContextObject):
+cdef class DisplacedMicromapArray(OptixContextObject):
     cdef object d_micromap_array_buffer
-    cdef OptixOpacityMicromapFlags _build_flags
+    cdef OptixDisplacementMicromapFlags _build_flags
     cdef size_t _buffer_size
     cdef unsigned int c_num_micromaps
     cdef tuple _micromap_types
-
     cdef void build(self, inputs, stream=*)
 
 
-cdef class BuildInputOpacityMicromap(OptixObject):
-    cdef OptixBuildInputOpacityMicromap build_input
-    cdef OpacityMicromapArray c_micromap_array
-    cdef object _d_index_buffer
-    cdef object _usage_counts
-    cdef vector[OptixOpacityMicromapUsageCount] c_usage_counts
+# cdef class BuildInputOpacityMicromap(OptixObject):
+#     cdef OptixBuildInputOpacityMicromap build_input
+#     cdef OpacityMicromapArray c_micromap_array
+#     cdef object _d_index_buffer
+#     cdef object _usage_counts
+#     cdef vector[OptixOpacityMicromapUsageCount] c_usage_counts
 

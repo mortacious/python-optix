@@ -34,9 +34,6 @@ __all__ = ['micromap_indices_to_base_barycentrics',
 cdef bool valid_subdivision_level(uint8_t[:, :] opacity):
     return (np.log2(opacity.shape[1]) / 2).is_integer()
 
-cdef bool is_baked(uint8_t[:, :] opacity):
-    return opacity[0, 0] > 3
-
 
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)   # Deactivate negative indexing.
@@ -186,11 +183,12 @@ cdef class OpacityMicromapInput(OptixObject):
     """
     def __init__(self,
                  opacity,
-                 format: typ.Optional[OpacityMicromapFormat] = None):
+                 format: typ.Optional[OpacityMicromapFormat] = None,
+                 baked=False):
         buffer = np.atleast_2d(opacity)
 
         format = OpacityMicromapFormat(format) if format is not None else None
-        if is_baked(buffer):
+        if baked:
             if not format:
                 raise ValueError("Baked input requires a format specification")
             shape_unbaked = (buffer.dtype.itemsize * 8 * buffer.shape[1]) / format.value
@@ -202,10 +200,6 @@ cdef class OpacityMicromapInput(OptixObject):
         else:
             subdivision_level = (np.log2(buffer.shape[1]) / 2)
             buffer, fmt = bake_opacity_micromap(buffer, format)
-
-            # elif format != fmt:
-            #     raise ValueError(f"Attempt to bake the micromap input resulted in a different format than the given one. "
-            #                      f"{format} != {fmt}.")
 
         self.buffer = buffer
         self.c_format = <OptixOpacityMicromapFormat>format.value
@@ -229,11 +223,6 @@ cdef class OpacityMicromapInput(OptixObject):
 
     def _repr_details(self):
         return f"ntriangles={self.ntriangles}, format={self.format.name}, subdivision_level={self.subdivision_level}"
-# ctypedef pair[OptixOpacityMicromapFormat, int] histogram_entry
-#
-# cdef bint histogram_entry_hash(const histogram_entry& s) nogil:
-#     return std_hash[OptixOpacityMicromapFormat]()(s.first) ^ std_hash[int]()(s.second)
-
 
 
 cdef class OpacityMicromapArray(OptixContextObject):
@@ -249,9 +238,8 @@ cdef class OpacityMicromapArray(OptixContextObject):
     inputs:
         An iterable of OpacityMicromapInput or numpy ndarrays. All numpy arrays will be converted into
         OpacityMicroMapInput automatically in this class.
-    flags:
-        A set of OpacityMicromapFlags to use for building this array. If None, the default OpacityMicromapFlags.NONE
-        is used.
+    prefer_fast_build:
+        If True, it prefers a fast built of the array over a fast trace.
     stream:
         Cuda stream to use for building this micromap array. If None the default stream is used.
     """

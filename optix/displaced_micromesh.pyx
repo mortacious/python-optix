@@ -22,7 +22,13 @@ from .context cimport DeviceContext
 
 optix_init()
 
-__all__ = []
+__all__ = ['DisplacementMicromapArrayIndexingMode', 
+           'DisplacementMicromapBiasAndScaleFormat',
+           'DisplacementMicromapDirectionFormat',
+           'DisplacementMicromapFormat',
+           'DisplacementMicromapTriangleFlags',
+           'DisplacementMicromapInput',
+           'DisplacedMicromapArray']
 
 
 class DisplacementMicromapArrayIndexingMode(IntEnum):
@@ -44,7 +50,6 @@ class DisplacementMicromapDirectionFormat(IntEnum):
 
 
 class DisplacementMicromapFormat(IntEnum):
-    NONE = OPTIX_DISPLACEMENT_MICROMAP_FORMAT_NONE
     FORMAT_64_MICRO_TRIS_64_BYTES = OPTIX_DISPLACEMENT_MICROMAP_FORMAT_64_MICRO_TRIS_64_BYTES
     FORMAT_256_MICRO_TRIS_128_BYTES  = OPTIX_DISPLACEMENT_MICROMAP_FORMAT_256_MICRO_TRIS_128_BYTES
     FORMAT_1024_MICRO_TRIS_128_BYTES = OPTIX_DISPLACEMENT_MICROMAP_FORMAT_1024_MICRO_TRIS_128_BYTES
@@ -56,61 +61,79 @@ class DisplacementMicromapTriangleFlags(IntFlag):
     DECIMATE_EDGE_12 = OPTIX_DISPLACEMENT_MICROMAP_TRIANGLE_FLAG_DECIMATE_EDGE_12
     DECIMATE_EDGE_20 = OPTIX_DISPLACEMENT_MICROMAP_TRIANGLE_FLAG_DECIMATE_EDGE_20
 
+_n_vertices_per_subdivision_level = (3, 6, 15, 45)
+
+# Offset into vertex index LUT (u major to hierarchical order) for subdivision levels 0 to 3
+# 6  values for subdiv lvl 1
+# 15 values for subdiv lvl 2
+# 45 values for subdiv lvl 3
+# cdef uint16_t *UMAJOR_TO_HIERARCHICAL_VTX_IDX_LUT_OFFSET = [0, 3, 9, 24, 69]
+# cdef uint16_t *UMAJOR_TO_HIERARCHICAL_VTX_IDX_LUT = [
+#     # level 0
+#     0, 2, 1,
+#     # level 1
+#     0, 3, 2, 5, 4, 1,
+#     # level 2
+#     0, 6, 3, 12, 2, 8, 7, 14, 13, 5, 9, 4, 11, 10, 1,
+#     # level 3
+#     0, 15, 6, 21, 3, 39, 12, 42, 2, 17, 16, 23, 22, 41, 40, 44, 43, 8, 18, 7, 24, 14, 36, 13, 20, 19, 26, 25,
+#     38, 37, 5, 27, 9, 33, 4, 29, 28, 35, 34, 11, 30, 10, 32, 31, 1 
+# ]
+
+DisplacementMicromapType = namedtuple("DisplacementMicromapType", ["format", "subdivision_level"])
+
 
 cdef class DisplacementMicromapInput(OptixObject):
     """
+    This class is a wrapper around an uint8-numpy array that will convert convert it into
+    the format required by the optix displacement micromesh of the requested format and subdivision level.
+    The class currently only supports inputs in a baked for all formats.
 
     Parameters
     ----------
-    dmm_data: The input array in unbaked format. must be an array of type uint8 with the shape (num_triangles, num_subtriangles,
-    format: Optional format specifier. Required for baked format, optional for unbaked. Invalid formats are not checked
-            for unbaked inputs.
+    dmm_data: The input array in baked format. must be an array of type uint8 with the shape (num_triangles, num_subtriangles, num_bytes)
+    fmt: Format specifier.
     """
     def __init__(self,
                  displacement,
                  subdivision_level: int,
                  format: DisplacementMicromapFormat):
 
-        format = DisplacementMicromapFormat(format)
-        if format == DisplacementMicromapFormat.FORMAT_64_MICRO_TRIS_64_BYTES:
+        if not np.issubdtype(displacement, np.uint8):
+            raise TypeError("Expected dtype=np.uint8.")
+
+        fmt = DisplacementMicromapFormat(format)
+        if fmt == DisplacementMicromapFormat.FORMAT_64_MICRO_TRIS_64_BYTES:
             dmm_subdivision_level_sub_triangles = max(0, int(subdivision_level) - 3)
             num_bytes_per_subtriangle = 64
-        elif format == DisplacementMicromapFormat.FORMAT_256_MICRO_TRIS_128_BYTES:
-            dmm_subdivision_level_sub_triangles = max(0, int(subdivision_level) - 4)
-            num_bytes_per_subtriangle = 128
-        elif format == DisplacementMicromapFormat.FORMAT_1024_MICRO_TRIS_128_BYTES:
-            dmm_subdivision_level_sub_triangles = 0
         else:
-            raise ValueError("DisplacementMicroMapFormat cannot be None")
+            #if not baked:
+            #    raise ValueError("Only baked input is supported for compressed formats")
+            num_bytes_per_subtriangle = 128
+            if fmt == DisplacementMicromapFormat.FORMAT_256_MICRO_TRIS_128_BYTES:
+                dmm_subdivision_level_sub_triangles = max(0, int(subdivision_level) - 4)
+            elif fmt == DisplacementMicromapFormat.FORMAT_1024_MICRO_TRIS_128_BYTES:
+                dmm_subdivision_level_sub_triangles = 0
+            else:
+                raise ValueError("Invalid DisplacementMicroMapFormat.")
 
         n_subtriangles = 1 << (2 * dmm_subdivision_level_sub_triangles)
-        dmm_data = dmm_data.reshape(-1, n_subtriangles, )
-        buffer = np.atleast_2d(dmm_data)
 
-        if is_baked(buffer):
-            if not format:
-                raise ValueError("Baked input requires a format specification")
-            shape_unbaked = (buffer.dtype.itemsize * 8 * buffer.shape[1]) / format.value
-            subdivision_level = (np.log2(shape_unbaked) / 2)
-
-            if not subdivision_level.is_integer():
-                ValueError(f"Shape of baked input ({opacity.shape[1]}) does "
-                           f"not correspond to a valid subdivision level in given format ({format}).")
-        else:
-            subdivision_level = (np.log2(buffer.shape[1]) / 2)
-            buffer, fmt = bake_opacity_micromap(buffer, format)
-
-            # elif format != fmt:
-            #     raise ValueError(f"Attempt to bake the micromap input resulted in a different format than the given one. "
-            #                      f"{format} != {fmt}.")
-
-        self.buffer = buffer
-        self.c_format = <OptixOpacityMicromapFormat>format.value
+        #if baked:
+        # reshape baked input into n_triangles, n_subtriangles, n_format_bytes for easier encoding
+        displacement = displacement.reshape(-1, n_subtriangles, num_bytes_per_subtriangle)
+        # TODO bake raw inputs
+        #else:
+        #    # reshape unbaked input into n_triangles, n_subtriangles, n_vertices
+        #    displacement = displacement.reshape(-1, n_subtriangles, _n_vertices_per_subdivision_level[subdivision_level])
+        #    
+        self.buffer = displacement
+        self.c_format = <OptixDisplacementMicromapFormat>fmt.value
         self.c_subdivision_level = subdivision_level
 
     @property
     def format(self):
-        return OpacityMicromapFormat(self.c_format)
+        return DisplacementMicromapFormat(self.c_format)
 
     @property
     def subdivision_level(self):
@@ -121,8 +144,187 @@ cdef class DisplacementMicromapInput(OptixObject):
         return self.buffer.shape[0]
 
     @property
+    def nsubtriangles(self):
+        return self.buffer.shape[1]
+
+    @property
     def nbytes(self):
         return self.buffer.size * self.buffer.itemsize
 
     def _repr_details(self):
-        return f"ntriangles={self.ntriangles}, format={self.format.name}, subdivision_level={self.subdivision_level}"
+        return f"ntriangles={self.ntriangles}, nsubtriangles={self.nsubtriangles}, format={self.format.name}, subdivision_level={self.subdivision_level}"
+
+    
+cdef class DisplacedMicromapArray(OptixContextObject):
+    """
+    Class representing an array of displaced micromaps on the optix device.
+    This class wraps the internal GPU buffer containing the micromap data and serves to build the structure from
+    one or multiple DisplacementMicromapInput inputs
+
+    Parameters
+    ----------
+    context:
+        The device context to use.
+    inputs:
+        An iterable of DisplacementMicromapInput.
+    prefer_fast_build:
+        If True, it prefers a fast built of the array over a fast trace.
+    stream:
+        Cuda stream to use for building this micromap array. If None the default stream is used.
+    """
+    def __init__(self,
+                 context: DeviceContext,
+                 inputs: typ.Iterable[DisplacementMicromapInput],
+                 prefer_fast_build: bool = False,
+                 stream: typ.Optional[cp.cuda.Stream] = None):
+        super().__init__(context)
+        self.d_micromap_array_buffer = None
+        self._micromap_types = None
+        self._build_flags = OPTIX_DISPLACEMENT_MICROMAP_FLAG_NONE
+        if prefer_fast_build:
+            self._build_flags = OPTIX_DISPLACEMENT_MICROMAP_FLAG_PREFER_FAST_BUILD
+        else:
+            self._build_flags = OPTIX_DISPLACEMENT_MICROMAP_FLAG_PREFER_FAST_TRACE
+        self.build(inputs, stream=stream)
+
+    cdef void build(self, inputs, stream=None):
+        # convert all inputs into the correct format first
+        inputs = ensure_iterable(inputs)
+
+        cdef OptixDisplacementMicromapArrayBuildInput build_input
+        build_input.flags = self._build_flags
+
+        cdef size_t inputs_size_in_bytes = 0
+        micromap_counts = defaultdict(lambda: 0)
+        micromap_types = []
+
+        self.c_num_micromaps = 0
+        # build the histogram from the input specifications and convert it into a cpp vector to pass it to the build input
+        for i in inputs:
+            omm_type = DisplacementMicromapType(i.format, i.subdivision_level)
+            micromap_counts[omm_type] += i.ntriangles
+            micromap_types.append(omm_type)
+            inputs_size_in_bytes += i.nbytes
+            self.c_num_micromaps += i.ntriangles
+        self._micromap_types = tuple(micromap_types)
+
+        cdef vector[OptixDisplacementMicromapHistogramEntry] histogram_entries
+        histogram_entries.resize(len(micromap_counts))
+        build_input.numDisplacementMicromapHistogramEntries = histogram_entries.size()
+
+        for i, (k, v) in enumerate(micromap_counts.items()):
+            histogram_entries[i].count = v
+            histogram_entries[i].format = <OptixDisplacementMicromapFormat>k.format.value
+            histogram_entries[i].subdivisionLevel = k.subdivision_level
+
+        build_input.displacementMicromapHistogramEntries = histogram_entries.data()
+        del micromap_counts
+
+        # allocate a buffer to hold all input micromaps and put it's pointer in the build input
+        d_displacement_values = cp.cuda.alloc(inputs_size_in_bytes)
+        build_input.displacementValuesBuffer = d_displacement_values.ptr
+
+        cdef unsigned int offset = 0
+        cdef vector[OptixDisplacementMicromapDesc] descs
+        cdef uint16_t[:, :] buffer_view
+        cdef unsigned int t
+        cdef unsigned int desc_i = 0;
+
+        descs.resize(self.c_num_micromaps)
+        #TODO use the actual triangles in the input array here!
+        # copy all input data into the device buffer
+        for i, inp in enumerate(inputs):
+            buffer_view = (<DisplacementMicromapInput>inp).buffer
+            num_bytes = inp.nbytes
+            cp.cuda.runtime.memcpy(d_displacement_values.ptr + offset,
+                                   <uintptr_t>&buffer_view[0,0],
+                                   <size_t>num_bytes,
+                                   cp.cuda.runtime.memcpyHostToDevice)
+            for t in range(inp.ntriangles):
+                # fill the descriptor array at the same time with to information in input
+                descs[desc_i].byteOffset = offset
+                offset += buffer_view.shape[1] * sizeof(uint16_t)
+                descs[desc_i].subdivisionLevel = <unsigned short>inp.subdivision_level
+                descs[desc_i].format = <unsigned short>inp.format.value
+                desc_i += 1
+
+        # copy the descriptor array onto the device
+        cdef size_t desc_size_in_bytes = descs.size() * sizeof(OptixDisplacementMicromapDesc)
+
+        d_desc_buffer = cp.cuda.alloc(desc_size_in_bytes)
+        cp.cuda.runtime.memcpy(d_desc_buffer.ptr, <uintptr_t>descs.data(), desc_size_in_bytes, cp.cuda.runtime.memcpyHostToDevice)
+
+        build_input.perDisplacementMicromapDescBuffer = d_desc_buffer.ptr
+        build_input.perDisplacementMicromapDescStrideInBytes = 0
+
+        cdef OptixMicromapBufferSizes build_sizes
+
+        optix_check_return(optixDisplacementMicromapArrayComputeMemoryUsage(self.context.c_context,
+                                                                       &build_input,
+                                                                       &build_sizes))
+        # TODO: do we have to align this buffer?
+        self.d_micromap_array_buffer = cp.cuda.alloc(build_sizes.outputSizeInBytes)
+        self._buffer_size = build_sizes.outputSizeInBytes
+
+        d_temp_buffer = cp.cuda.alloc(build_sizes.tempSizeInBytes)
+
+        cdef OptixMicromapBuffers micromap_buffers
+
+        micromap_buffers.tempSizeInBytes = build_sizes.tempSizeInBytes
+        micromap_buffers.temp = d_temp_buffer.ptr
+
+        micromap_buffers.outputSizeInBytes = build_sizes.outputSizeInBytes
+        micromap_buffers.output = self.d_micromap_array_buffer.ptr
+
+        cdef uintptr_t c_stream = 0
+
+        if stream is not None:
+            c_stream = stream.ptr
+        with nogil:
+            optix_check_return(optixDisplacementMicromapArrayBuild(self.context.c_context,
+                                                              <CUstream>c_stream,
+                                                              &build_input,
+                                                              &micromap_buffers))
+        # all temporary buffers will be freed automatically here
+
+    @property
+    def types(self):
+        return self._micromap_types
+
+    def __deepcopy__(self, memo):
+        """
+        Perform a deep copy of the OpactiyMicromap by using the standard python copy.deepcopy function.
+        """
+        # relocate on the same device to perform a regular deep copy
+        result = self.relocate(device=None)
+        memo[id(self)] = result
+        return result
+
+    def _repr_details(self):
+        return f"size={self._buffer_size}, nmicromaps={self.c_num_micromaps}"
+
+    def relocate(self,
+                 device: typ.Optional[DeviceContext] = None,
+                 stream: typ.Optional[cp.cuda.Stream] = None) -> DisplacedMicromapArray:
+        """
+        Relocate this displacement micromap array into another copy. Usually this is equivalent to a deep copy.
+        Additionally, the micromap array can be copied to a different device by specifying the device
+        parameter with a different DeviceContext.
+
+        THIS OPERATION IS CURRENTLY NOT SUPPORTED BY OPTIX!
+
+        Parameters
+        ----------
+        device:
+            An optional DeviceContext. The resulting copy of the micromap array will be copied
+            to this device. If None, the micromap array's current device is used.
+        stream:
+            The stream to use for the relocation. If None, the default stream (0) is used.
+
+        Returns
+        -------
+        copy: OpacityMicromapArray
+            The copy of the OpacityMicromapArray on the new device
+        """
+
+        raise RuntimeError("Relocation of displacement micromap arrays is currently not supported.")

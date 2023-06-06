@@ -3,7 +3,7 @@ from .context cimport OptixDeviceContext, OptixContextObject
 from libcpp.vector cimport vector
 from .base cimport OptixObject
 from libc.stdint cimport uintptr_t, uint32_t
-from .micromap cimport OptixBuildInputOpacityMicromap, BuildInputOpacityMicromap
+from .opacity_micromap cimport OptixBuildInputOpacityMicromap, BuildInputOpacityMicromap
 
 
 cdef extern from "optix.h" nogil:
