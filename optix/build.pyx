@@ -807,16 +807,16 @@ cdef class RelocationInstanceDependency(RelocationDependency):
 
 cdef class RelocationTriangleDependency(RelocationDependency):
     cdef unsigned int num_sbt_records
-    cdef OpacityMicromapArray micromap
+    cdef OpacityMicromapArray opacity_micromap
 
     def __init__(self, num_sbt_records, micromap=None):
         super().__init__(BuildInputType.INSTANCES)
         self.num_sbt_records = num_sbt_records
-        self.micromap = micromap
+        self.opacity_micromap = micromap
 
     cdef RelocationInstanceDependency relocate(self, device, stream):
-        if self.micromap is not None:
-            relocated_micromap = self.micromap.relocate(device=device, stream=stream)
+        if self.opacity_micromap is not None:
+            relocated_micromap = self.opacity_micromap.relocate(device=device, stream=stream)
         else:
             relocated_micromap = None
         result = self.__class__(self.num_sbt_records, relocated_micromap)
@@ -825,7 +825,7 @@ cdef class RelocationTriangleDependency(RelocationDependency):
     cdef void fill_relocation_input(self, OptixRelocateInput& input):
         input.type = self.type
         input.triangleArray.numSbtRecords = self.num_sbt_records
-        input.triangleArray.opacityMicromap.opacityMicromapArray = self.micromap.d_micromap_array_buffer.ptr
+        input.triangleArray.opacityMicromap.opacityMicromapArray = self.opacity_micromap.d_micromap_array_buffer.ptr
 
 
 cdef class AccelerationStructure(OptixContextObject):
@@ -950,7 +950,7 @@ cdef class AccelerationStructure(OptixContextObject):
                 if inputs_size > 1:
                     raise ValueError("Only a single build input allowed for instance builds")
             elif isinstance(build_input, BuildInputTriangleArray):
-                micromap = <BuildInputTriangleArray>build_input.micromap
+                micromap = <BuildInputTriangleArray>build_input.opacity_micromap
                 micromap_array = micromap.micromap_array if micromap is not None else None
                 relocation_dep = RelocationTriangleDependency(build_input.num_sbt_records, micromap=micromap_array)
             else:

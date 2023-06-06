@@ -23,12 +23,11 @@ from .context cimport DeviceContext
 optix_init()
 
 __all__ = ['DisplacementMicromapArrayIndexingMode', 
-           'DisplacementMicromapBiasAndScaleFormat',
-           'DisplacementMicromapDirectionFormat',
            'DisplacementMicromapFormat',
            'DisplacementMicromapTriangleFlags',
            'DisplacementMicromapInput',
-           'DisplacedMicromapArray']
+           'DisplacementMicromapArray',
+           'BuildInputDisplacementMicromap']
 
 
 class DisplacementMicromapArrayIndexingMode(IntEnum):
