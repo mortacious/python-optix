@@ -4,7 +4,7 @@ from libcpp.vector cimport vector
 from .base cimport OptixObject
 from libc.stdint cimport uintptr_t, uint32_t
 from .opacity_micromap cimport OptixBuildInputOpacityMicromap, BuildInputOpacityMicromap
-
+from .displacement_micromap cimport OptixBuildInputDisplacementMicromap, BuildInputDisplacementMicromap
 
 cdef extern from "optix.h" nogil:
     cdef enum OptixBuildFlags:
@@ -158,6 +158,7 @@ cdef extern from "optix.h" nogil:
         unsigned int primitiveIndexOffset
         OptixTransformFormat transformFormat
         OptixBuildInputOpacityMicromap opacityMicromap
+        OptixBuildInputDisplacementMicromap displacementMicromap
 
 
     cdef struct OptixBuildInputSphereArray:
@@ -336,6 +337,7 @@ cdef class BuildInputTriangleArray(BuildInputArray):
     cdef object _d_pre_transform
     cdef vector[unsigned int] _flags
     cdef BuildInputOpacityMicromap c_opacity_micromap
+    cdef BuildInputDisplacementMicromap c_displacement_micromap
 
 
 cdef class BuildInputCustomPrimitiveArray(BuildInputArray):

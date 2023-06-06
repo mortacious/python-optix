@@ -11,3 +11,7 @@ imgui.ini
 *.c
 .*
 include/
+
+optix/_version.py
+
+*.whl

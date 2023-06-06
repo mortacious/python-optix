@@ -74,8 +74,6 @@ extensions = cythonize(extensions, language_level="3",
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-version = import_module_from_path('optix/_version.py').__version__
-
 package_data = {}
 
 

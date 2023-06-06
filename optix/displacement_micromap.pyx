@@ -37,18 +37,6 @@ class DisplacementMicromapArrayIndexingMode(IntEnum):
     INDEXED = OPTIX_DISPLACEMENT_MICROMAP_ARRAY_INDEXING_MODE_INDEXED
 
 
-class DisplacementMicromapBiasAndScaleFormat(IntEnum):
-    NONE = OPTIX_DISPLACEMENT_MICROMAP_BIAS_AND_SCALE_FORMAT_NONE
-    FLOAT2 = OPTIX_DISPLACEMENT_MICROMAP_BIAS_AND_SCALE_FORMAT_FLOAT2
-    HALF2 = OPTIX_DISPLACEMENT_MICROMAP_BIAS_AND_SCALE_FORMAT_HALF2
-
-
-class DisplacementMicromapDirectionFormat(IntEnum):
-    NONE = OPTIX_DISPLACEMENT_MICROMAP_DIRECTION_FORMAT_NONE
-    FLOAT3 = OPTIX_DISPLACEMENT_MICROMAP_DIRECTION_FORMAT_FLOAT3
-    HALF3 = OPTIX_DISPLACEMENT_MICROMAP_DIRECTION_FORMAT_HALF3
-
-
 class DisplacementMicromapFormat(IntEnum):
     FORMAT_64_MICRO_TRIS_64_BYTES = OPTIX_DISPLACEMENT_MICROMAP_FORMAT_64_MICRO_TRIS_64_BYTES
     FORMAT_256_MICRO_TRIS_128_BYTES  = OPTIX_DISPLACEMENT_MICROMAP_FORMAT_256_MICRO_TRIS_128_BYTES
@@ -155,7 +143,7 @@ cdef class DisplacementMicromapInput(OptixObject):
         return f"ntriangles={self.ntriangles}, nsubtriangles={self.nsubtriangles}, format={self.format.name}, subdivision_level={self.subdivision_level}"
 
     
-cdef class DisplacedMicromapArray(OptixContextObject):
+cdef class DisplacementMicromapArray(OptixContextObject):
     """
     Class representing an array of displaced micromaps on the optix device.
     This class wraps the internal GPU buffer containing the micromap data and serves to build the structure from
@@ -305,7 +293,7 @@ cdef class DisplacedMicromapArray(OptixContextObject):
 
     def relocate(self,
                  device: typ.Optional[DeviceContext] = None,
-                 stream: typ.Optional[cp.cuda.Stream] = None) -> DisplacedMicromapArray:
+                 stream: typ.Optional[cp.cuda.Stream] = None) -> DisplacementMicromapArray:
         """
         Relocate this displacement micromap array into another copy. Usually this is equivalent to a deep copy.
         Additionally, the micromap array can be copied to a different device by specifying the device
@@ -328,3 +316,131 @@ cdef class DisplacedMicromapArray(OptixContextObject):
         """
 
         raise RuntimeError("Relocation of displacement micromap arrays is currently not supported.")
+
+
+cdef class BuildInputDisplacementMicromap(OptixObject):
+    """
+    Build input for an array of micromaps. Inputs of this type can optionally be passed to a
+    BuildInputTriangleArray to use micromaps for it's triangles. Additionally an array of the usage_counts
+    for the OMMs in the Array needs to be passed as a list.
+    If the indexing mode is specified as INDEXED, an additional index buffer containing an index into the omm array or one of
+    the values in OpacityMicromapPredefinedIndex is required.
+
+    Parameters
+    ----------
+    omm_array:
+        The DisplacementMicromapArray to use by the triangles.
+    usage_counts:
+        The number of times each omm in the OpacityMicromapArray is used.
+    indexing_mode:
+        The indexing mode the omms should use. Must be one of the values in OpacityMicromapArrayIndexingMode.
+        By default NONE is used, disabling the use of OMMs
+    index_buffer:
+        If the indexing_mode is INDEXED, this additional index buffer, specifiing an omm to use or the default value
+        for each triangle in the geometry is required.
+    """
+    def __init__(self,
+                 DisplacementMicromapArray omm_array,
+                 displacement_directions: np.ndarray,
+                 usage_counts: Sequence[int],
+                 indexing_mode: DisplacementMicromapArrayIndexingMode = DisplacementMicromapArrayIndexingMode.NONE,
+                 index_buffer = None,
+                 bias_and_scale = None):
+        indexing_mode = DisplacementMicromapArrayIndexingMode(indexing_mode)
+
+        self.build_input.indexingMode = <OptixDisplacementMicromapArrayIndexingMode>indexing_mode.value
+
+        if indexing_mode == DisplacementMicromapArrayIndexingMode.INDEXED:
+            if index_buffer is None:
+                raise ValueError("index_buffer is required for indexing_mode=INDEXED.")
+            if not any(np.issubdtype(index_buffer.dtype, dt) for dt in (np.uint16, np.uint32)):
+                raise ValueError("index_buffer must be of dtype np.uint16 or np.uint32")
+            self._d_index_buffer = cp.asarray(index_buffer).ravel()
+            # enable the index buffer in the build_input struct
+            self.build_input.displacementMicromapIndexBuffer = self._d_index_buffer.data.ptr
+            self.build_input.displacementMicromapIndexOffset = 0
+            self.build_input.displacementMicromapIndexSizeInBytes = self._d_index_buffer.itemsize
+            self.build_input.displacementMicromapIndexStrideInBytes = self._d_index_buffer.strides[0]
+        else:
+            self.build_input.displacementMicromapIndexBuffer = 0
+            self.build_input.displacementMicromapIndexOffset = 0
+            self.build_input.displacementMicromapIndexSizeInBytes = 0
+            self.build_input.displacementMicromapIndexStrideInBytes = 0
+
+        self.c_micromap_array = omm_array
+        self.build_input.displacementMicromapArray = self.c_micromap_array.d_micromap_array_buffer.data.ptr
+        
+        # must be shape num_triangles, 3, 3
+        displacement_directions = cp.asarray(displacement_directions).reshape(-1, 3, 3)
+        if np.issubdtype(displacement_directions.dtype, np.float16):
+            self.build_input.vertexDirectionFormat = OPTIX_DISPLACEMENT_MICROMAP_DIRECTION_FORMAT_HALF3
+        else:
+            displacement_directions = displacement_directions.astype(np.float32)
+            self.build_input.vertexDirectionFormat = OPTIX_DISPLACEMENT_MICROMAP_DIRECTION_FORMAT_FLOAT3
+        self._d_displacement_directions = displacement_directions
+        self.build_input.vertexDirectionsBuffer = self._d_displacement_directions.data.ptr
+        self.build_input.vertexDirectionStrideInBytes = self._d_displacement_directions.strides[1]
+        
+        if bias_and_scale is not None:
+            bias_and_scale = cp.asarray(displacement_directions).reshape(-1, 3, 2)
+            if bias_and_scale.shape[0] != displacement_directions.shape[0]:
+                raise ValueError("Invalid shape of bias_and_scale array")
+            if np.issubdtype(bias_and_scale.dtype, np.float16):
+                self.build_input.vertexBiasAndScaleFormat = OPTIX_DISPLACEMENT_MICROMAP_BIAS_AND_SCALE_FORMAT_HALF2
+            else:
+                bias_and_scale = bias_and_scale.astype(np.float32)
+                self.build_input.vertexBiasAndScaleFormat = OPTIX_DISPLACEMENT_MICROMAP_BIAS_AND_SCALE_FORMAT_FLOAT2
+
+            self._d_bias_and_scale = displacement_directions
+            self.build_input.vertexBiasAndScaleBuffer = self._d_bias_and_scale.data.ptr
+            self.build_input.vertexBiasAndScaleStrideInBytes = self._d_bias_and_scale.strides[1]
+        else:
+            self.build_input.vertexBiasAndScaleBuffer = 0
+            self.build_input.vertexBiasAndScaleStrideInBytes = 0
+            self.build_input.vertexBiasAndScaleFormat = OPTIX_DISPLACEMENT_MICROMAP_BIAS_AND_SCALE_FORMAT_NONE
+
+
+        # fill the usage counts vector from the specified usage array
+        # TODO: is there a way to determine the usage count automatically?
+        micromap_types = self.c_micromap_array.types
+        if len(usage_counts) != len(micromap_types):
+            raise IndexError(f"Number of entries in usage_count must be equal to the number of omms in micromap_array. "
+                             f"Expected {len(micromap_types)}), got ({len(usage_counts)})")
+        usage_count_hist = defaultdict(lambda: 0)
+
+        for type, usage_count in zip(micromap_types, usage_counts):
+            usage_count_hist[type] += usage_count
+
+        self._usage_counts = usage_count_hist
+        self.c_usage_counts.resize(len(usage_counts))
+        for i, (k, v) in enumerate(usage_count_hist.items()):
+            self.c_usage_counts[i].count = v
+            self.c_usage_counts[i].format = <OptixDisplacementMicromapFormat>k.format.value
+            self.c_usage_counts[i].subdivisionLevel = k.subdivision_level
+
+        self.build_input.displacementMicromapUsageCounts = self.c_usage_counts.data()
+        self.build_input.numDisplacementMicromapUsageCounts = self.c_usage_counts.size()
+
+    @property
+    def usage_counts(self):
+        return self._usage_counts
+
+    @property
+    def types(self):
+        return self.c_micromap_array.types
+
+    @property
+    def micromap_array(self):
+        return self.c_micromap_array
+
+    @property
+    def index_buffer(self):
+        return self._d_index_buffer
+
+    @property
+    def displacement_directions(self):
+        return self._d_displacement_directions
+
+    @property
+    def bias_and_scale(self):
+        return self._d_bias_and_scale
