@@ -1,5 +1,9 @@
 # Python-OptiX
 
+[![PyPi license](https://badgen.net/pypi/license/python-optix/)](https://pypi.org/project/python-optix/) [![PyPi version](https://badgen.net/pypi/v/python-optix/)](https://pypi.org/project/python-optix/)
+[![PyPI format](https://img.shields.io/pypi/format/python-optix.svg)](https://pypi.python.org/pypi/python-optix/)
+[![PyPI pyversions](https://img.shields.io/pypi/pyversions/python-optix.svg)](https://pypi.python.org/pypi/python-optix/)
+
 Python-OptiX is a Python wrapper for the 
 [NVIDIA OptiX](https://developer.nvidia.com/rtx/ray-tracing/optix) ray tracing engine, 
 allowing for GPU-accelerated ray tracing applications in Python.

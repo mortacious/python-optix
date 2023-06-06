@@ -136,7 +136,6 @@ except ImportError:
 
 setup(
     name="python-optix",
-    version=version,
     author="Felix Igelbrink",
     author_email="felix.igelbrink@uni-osnabrueck.de",
     description="Python bindings to the OptiX raytracing engine by nvidia",
@@ -157,6 +156,7 @@ setup(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
         "License :: OSI Approved :: MIT License",
         "Operating System :: POSIX :: Linux",
         "Operating System :: Microsoft :: Windows",
@@ -170,6 +170,11 @@ setup(
     extras_require={
         'examples': ["pillow", "pyopengl", "pyglfw", "pyimgui"]
     },
+    use_scm_version={
+        "write_to": "optix/_version.py",
+        "version_scheme": "release-branch-semver",
+    },
+    setup_requires=['setuptools_scm'],
     python_requires=">=3.8",
     package_data=package_data,
     zip_safe=False,
