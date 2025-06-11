@@ -1,133 +1,107 @@
-# Code taken from the cupy installation scripts
-# https://github.com/cupy/cupy/blob/master/install/build.py
-
-# Copyright (c) 2015 Preferred Infrastructure, Inc.
-# Copyright (c) 2015 Preferred Networks, Inc.
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
-
-
+from __future__ import annotations
 import os
-from itertools import chain
-import pathlib
+import shutil
+from contextlib import contextmanager
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from typing import Generator, Any, Optional
 
-_cuda_path_cache = 'NOT_INITIALIZED'
-_optix_path_cache = 'NOT_INITIALIZED'
-
-
-def get_path(key):
-    env = os.environ.get(key, '')
-    if env:
-        return env.split(os.pathsep)
-    else:
-        return tuple()
+_cuda_include_path = None
+_optix_include_path = None
 
 
-def search_on_path(filenames, keys=None):
-    if keys is None:
-        keys = ('PATH',)
-    for p in chain(*[get_path(key) for key in keys]):
-        for filename in filenames:
-            full = os.path.abspath(os.path.join(p, filename))
-            if os.path.exists(full):
-                return os.path.abspath(full)
+def _get_cuda_path() -> str | None:
+    # Taken from cupy setup scripts
+    # Use environment variable
+    cuda_path = os.environ.get('CUDA_PATH', '')  # Nvidia default on Windows
+    if os.path.exists(cuda_path):
+        return cuda_path
+
+    # Use nvcc path
+    nvcc_path = shutil.which('nvcc')
+    if nvcc_path is not None:
+        return os.path.dirname(os.path.dirname(nvcc_path))
+
+    # Use typical path
+    if os.path.exists('/usr/local/cuda'):
+        return '/usr/local/cuda'
+
     return None
 
 
-def get_cuda_path(environment_variable=None):
-    global _cuda_path_cache
+def cuda_include_path() -> str | None:
+    # Returns the CUDA installation path or None if not found.
+    global _cuda_include_path
+    if _cuda_include_path is None:
+        p = _get_cuda_path()
+        if p is None:
+            return None
+        
+        for test_path in ("include", "targets/x86_64-linux/include"):
+            include_path = os.path.join(p, test_path)
+            print("testing path", include_path)
+            cuda_header_path = os.path.join(include_path, "cuda.h")
+            if os.path.isfile(cuda_header_path):
+                _cuda_include_path = include_path
+                break
+    print("CUDA PATH", _cuda_include_path)
+    return _cuda_include_path
+    
 
-    # Use a magic word to represent the cache not filled because None is a
-    # valid return value.
-    if _cuda_path_cache != 'NOT_INITIALIZED':
-        return _cuda_path_cache
+def optix_include_path(version: Optional[str | tuple] = None, path: str = "~/.cache/python-optix") -> str:
+    global _optix_include_path
 
-    nvcc_path = search_on_path(('nvcc', 'nvcc.exe'), keys=(environment_variable, 'PATH') if environment_variable is not
-                                                                                            None else ('PATH',))
-    cuda_path_default = None
-    if nvcc_path is not None:
-        cuda_path_default = os.path.normpath(
-            os.path.join(os.path.dirname(nvcc_path), '..'))
+    if _optix_include_path is None:
+        import subprocess
+        import shlex
 
-    if cuda_path_default is not None:
-        _cuda_path_cache = cuda_path_default
-    elif os.path.exists('/usr/local/cuda'):
-        _cuda_path_cache = '/usr/local/cuda'
-    else:
-        _cuda_path_cache = None
-    return _cuda_path_cache
+        if version is None:
+            # only available in installed package
+            from .context import optix_version
+            version = optix_version()
+        if not isinstance(version, str):
+            version = ".".join((str(v) for v in version))
+        path = os.path.expanduser(path)
+        out_path = os.path.join(path, f"optix-dev-{version}")
 
+        if not os.path.exists(out_path):
+            os.makedirs(path, exist_ok=True)
 
-def get_cuda_include_path(environment_variable=None):
-    cuda_path = get_cuda_path(environment_variable=environment_variable)
-    if cuda_path is None:
-        return None
-    cuda_include_path = os.path.join(cuda_path, "include")
-    if os.path.exists(cuda_include_path):
-        return cuda_include_path
-    else:
-        return None
+            out_file_dl = out_path + ".tar.gz"
+            command = f"curl -LJ -o {out_file_dl} https://github.com/NVIDIA/optix-dev/archive/refs/tags/v{version}.tar.gz"
+            args = shlex.split(command)
+            print("downloading optix headers with command", command)
+            try:
+                subprocess.check_call(args, shell=False)
+            except subprocess.CalledProcessError as e:
+                raise ValueError(f"Unable to download optix headers for version {version} into {path}.") from e
 
+            command = f"tar -xf {out_file_dl} -C {path}"
+            args = shlex.split(command)
+            print("extracting optix headers with command", args)
 
-def get_optix_path(path_hint=None, environment_variable=None):
-    global _optix_path_cache
+            try:
+                subprocess.check_call(args, shell=False)
+            except subprocess.CalledProcessError as e:
+                raise ValueError(f"Unable to extract optix headers at path {out_file_dl}.") from e
 
-    # Use a magic word to represent the cache not filled because None is a
-    # valid return value.
-    if _optix_path_cache != 'NOT_INITIALIZED':
-        return _optix_path_cache
+        optix_h_file = os.path.join(out_path, "include/optix.h")
+        if not os.path.exists(optix_h_file):
+            raise ValueError(f"Result path {out_path} does not contain the optix headers.")
+        
+        _optix_include_path = os.path.join(out_path, "include")
 
-    if path_hint is None:
-        # prefer the dedicated environment variable
-        optix_header_path = search_on_path(('include/optix.h',), keys=(environment_variable,) if environment_variable is not
-                                                                                                 None else None)
-        if optix_header_path is None:
-            # search on the default path
-            optix_header_path = search_on_path(('include/optix.h',), keys=('PATH', 'OPTIX_PATH'))
-
-        if optix_header_path is not None:
-            optix_header_path = os.path.normpath(os.path.join(os.path.dirname(optix_header_path), '..'))
-    else:
-        optix_header_path = path_hint
-        if not os.path.exists(os.path.join(optix_header_path, "include/optix.h")):
-            raise ValueError(f"Path {optix_header_path} does not contain an optix installation.")
-
-    if optix_header_path is not None:
-        _optix_path_cache = optix_header_path
-    else:
-        _optix_path_cache = None
-
-    return _optix_path_cache
-
-
-def get_local_optix_include_path():
-    local_include_path = pathlib.Path(__file__).parent / "include"
-    return str(local_include_path) if local_include_path.exists() else None
+    return _optix_include_path
 
 
-def get_optix_include_path(environment_variable=None):
-    optix_path = get_optix_path(environment_variable=environment_variable)
-    if optix_path is None:
-        return None
-    optix_include_path = os.path.join(optix_path, "include")
-    if os.path.exists(optix_include_path):
-        return optix_include_path
-    else:
-        return None
+@contextmanager
+def temp_optix_include_path(version: str | tuple) -> Generator[Any, Any, Any]:
+    temp_dir = os.path.abspath(".tmp")
+    os.makedirs(temp_dir, exist_ok=True)
+    #with tempfile.TemporaryDirectory() as td:
+    optix_path = optix_include_path(version, path=temp_dir)
+    yield optix_path
+    shutil.rmtree(temp_dir)
+
+
 

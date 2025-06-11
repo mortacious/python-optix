@@ -10,6 +10,7 @@ imgui.ini
 *.cpp
 *.c
 .*
+*.tar.gz
 include/
 
 optix/_version.py

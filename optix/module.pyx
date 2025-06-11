@@ -3,7 +3,7 @@
 from enum import IntEnum, IntFlag
 import os
 import warnings
-from .path_utility import get_cuda_include_path, get_optix_include_path, get_local_optix_include_path
+from .path_utility import cuda_include_path, optix_include_path
 from .common cimport optix_check_return, optix_init
 from .context cimport DeviceContext
 from .pipeline cimport PipelineCompileOptions
@@ -421,18 +421,15 @@ cdef class Module(OptixContextObject):
             prog = NVRTCProgram(src, name, **kwargs)
             flags = list(compile_flags)
             # get cuda and optix_include_paths
-            cuda_include_path = get_cuda_include_path()
-            optix_include_path = get_local_optix_include_path()
-            if optix_include_path is None or not os.path.exists(optix_include_path):
-                # attempt to load the global path if the local path is not available
-                optix_include_path = get_optix_include_path()
-            if optix_include_path is None:
-                raise ValueError("Unable to locate the optix headers. Make sure that either the OPTIX_PATH environement variable is set"
-                                 "correctly or the optix headers are embedded into this package.")
+            cuda_path = cuda_include_path()
+            optix_path = optix_include_path()
+            
+            if optix_path is None:
+                raise ValueError("Unable to locate the optix headers. Make sure the package is installed correctly.")
             if <Module>self.context.log_callback is not None:
                 # hook into the logging system for this output
-                <Module>self.context.log_callback(4, "build", f"Using optix include path: {optix_include_path}")
-            flags.extend([f'-I{cuda_include_path}', f'-I{optix_include_path}'])
+                <Module>self.context.log_callback(4, "build", f"Using optix include path: {optix_path}")
+            flags.extend([f'-I{cuda_path}', f'-I{optix_path}'])
             ptx, _ = prog.compile(flags)
             return ptx
         else:
