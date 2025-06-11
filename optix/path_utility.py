@@ -99,7 +99,7 @@ def get_optix_path(path_hint=None, environment_variable=None):
                                                                                                  None else None)
         if optix_header_path is None:
             # search on the default path
-            optix_header_path = search_on_path(('../optix/include/optix.h',), keys=('PATH', 'OPTIX_PATH'))
+            optix_header_path = search_on_path(('include/optix.h',), keys=('PATH', 'OPTIX_PATH'))
 
         if optix_header_path is not None:
             optix_header_path = os.path.normpath(os.path.join(os.path.dirname(optix_header_path), '..'))
