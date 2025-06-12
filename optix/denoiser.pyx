@@ -19,8 +19,7 @@ __all__ = ['DenoiserModelKind',
 
 class DenoiserAlphaMode(enum.IntEnum):
     COPY = OPTIX_DENOISER_ALPHA_MODE_COPY
-    ALPHA_AS_AOV = OPTIX_DENOISER_ALPHA_MODE_ALPHA_AS_AOV
-    FULL_DENOISE_PASS = OPTIX_DENOISER_ALPHA_MODE_FULL_DENOISE_PASS
+    DENOISE = OPTIX_DENOISER_ALPHA_MODE_DENOISE
 
 
 class DenoiserAOVType(enum.IntEnum):
@@ -154,6 +153,7 @@ cdef class Denoiser(OptixContextObject):
                  model_kind=DenoiserModelKind.LHR,
                  guide_albedo=False,
                  guide_normals=False,
+                 denoise_alpha: DenoiserAlphaMode = DenoiserAlphaMode.COPY,
                  kp_mode=False,
                  tile_size=None):
         super().__init__(context)
@@ -173,6 +173,7 @@ cdef class Denoiser(OptixContextObject):
             self.model_kind = DenoiserModelKind(model_kind)
             options.guideAlbedo = 1 if guide_albedo else 0
             options.guideNormal = 1 if guide_normals else 0
+            options.denoiseAlpha = <OptixDenoiserAlphaMode>denoise_alpha.value
 
             optix_check_return(optixDenoiserCreate(self.context.c_context,
                                                    model_kind.value,
@@ -247,7 +248,6 @@ cdef class Denoiser(OptixContextObject):
                flow_trustworthiness=None,
                outputs=None,
                aov_types: typ.Optional[typ.Union[typ.Sequence[DenoiserAOVType], DenoiserAOVType]] = None,
-               denoise_alpha: DenoiserAlphaMode = DenoiserAlphaMode.COPY,
                blend_factor: float = 0.0,
                stream: typ.Optional[cp.cuda.Stream] = None,
                temporal_use_previous_layer: bool = False):
@@ -328,9 +328,7 @@ cdef class Denoiser(OptixContextObject):
         params.hdrIntensity = <CUdeviceptr>self._d_intensity.ptr if self._d_intensity is not None else 0
         params.hdrAverageColor = <CUdeviceptr>self._d_avg_color.ptr if self._d_avg_color is not None else 0
         params.blendFactor = blend_factor
-
         params.temporalModeUsePreviousLayers = 1 if temporal_use_previous_layer and temporal_mode else 0
-        params.denoiseAlpha = <OptixDenoiserAlphaMode>denoise_alpha.value
 
         cdef uintptr_t c_stream = 0
 

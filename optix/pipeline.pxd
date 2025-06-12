@@ -16,7 +16,6 @@ cdef extern from "optix_includes.h" nogil:
         OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW,
         OPTIX_EXCEPTION_FLAG_TRACE_DEPTH,
         OPTIX_EXCEPTION_FLAG_USER,
-        OPTIX_EXCEPTION_FLAG_DEBUG
 
     cdef enum OptixTraversableGraphFlags:
         OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY,

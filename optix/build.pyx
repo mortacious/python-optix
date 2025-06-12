@@ -10,7 +10,6 @@ from libcpp.vector cimport vector
 from .common import round_up, ensure_iterable
 import typing as typ
 from .opacity_micromap cimport BuildInputOpacityMicromap, OpacityMicromapArray
-from .displacement_micromap cimport BuildInputDisplacementMicromap, DisplacementMicromapArray
 from cython.operator import dereference
 
 optix_init()
@@ -144,8 +143,7 @@ cdef class BuildInputTriangleArray(BuildInputArray):
                  sbt_record_offset_buffer = None,
                  pre_transform = None,
                  primitive_index_offset = 0,
-                 opacity_micromap: typ.Optional[BuildInputOpacityMicromap] = None,
-                 displacement_micromap: typ.Optional[BuildInputDisplacementMicromap] = None):
+                 opacity_micromap: typ.Optional[BuildInputOpacityMicromap] = None):
         super().__init__(BuildInputType.TRIANGLES)
         self._d_vertex_buffers = [cp.asarray(vb) for vb in ensure_iterable(vertex_buffers)]
         self._d_vertex_buffer_ptrs.reserve(len(self._d_vertex_buffers))
@@ -223,15 +221,6 @@ cdef class BuildInputTriangleArray(BuildInputArray):
             # TODO check shape
             self.build_input.opacityMicromap = self.c_opacity_micromap.build_input
 
-        self.c_displacement_micromap = displacement_micromap
-        cdef OptixBuildInputDisplacementMicromap* c_displacement_micromap
-        if self.c_displacement_micromap is not None:
-            # TODO check shape
-
-            # the c compiler does not like doing this in a single line for some reason
-            c_displacement_micromap = &(self.c_displacement_micromap.build_input)
-            self.build_input.displacementMicromap = dereference(c_displacement_micromap)
-
     def __dealloc__(self):
         pass
 
@@ -273,10 +262,6 @@ cdef class BuildInputTriangleArray(BuildInputArray):
     @property
     def opacity_micromap(self):
         return self.c_opacity_micromap
-
-    @property
-    def displacment_micromap(self):
-        return self.c_displacement_micromap
 
     @property
     def num_sbt_records(self):
