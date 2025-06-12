@@ -6,7 +6,7 @@ import cupy as cp
 
 __all__ = ['optix_version', 'DeviceContext']
 
-optix_init()
+optix_init() # automatically initialize optix upon import
 
 def optix_version():
     return _OPTIX_VERSION_MAJOR, _OPTIX_VERSION_MINOR, _OPTIX_VERSION_MICRO

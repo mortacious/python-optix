@@ -36,15 +36,13 @@ def cuda_include_path() -> str | None:
         p = _get_cuda_path()
         if p is None:
             return None
-        
+        # include the conda include directories as well
         for test_path in ("include", "targets/x86_64-linux/include"):
             include_path = os.path.join(p, test_path)
-            print("testing path", include_path)
             cuda_header_path = os.path.join(include_path, "cuda.h")
             if os.path.isfile(cuda_header_path):
                 _cuda_include_path = include_path
                 break
-    print("CUDA PATH", _cuda_include_path)
     return _cuda_include_path
     
 
@@ -70,7 +68,7 @@ def optix_include_path(version: Optional[str | tuple] = None, path: str = "~/.ca
             out_file_dl = out_path + ".tar.gz"
             command = f"curl -LJ -o {out_file_dl} https://github.com/NVIDIA/optix-dev/archive/refs/tags/v{version}.tar.gz"
             args = shlex.split(command)
-            print("downloading optix headers with command", command)
+            #print("downloading optix headers with command", command)
             try:
                 subprocess.check_call(args, shell=False)
             except subprocess.CalledProcessError as e:
@@ -78,7 +76,7 @@ def optix_include_path(version: Optional[str | tuple] = None, path: str = "~/.ca
 
             command = f"tar -xf {out_file_dl} -C {path}"
             args = shlex.split(command)
-            print("extracting optix headers with command", args)
+            #print("extracting optix headers with command", args)
 
             try:
                 subprocess.check_call(args, shell=False)

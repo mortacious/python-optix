@@ -17,6 +17,5 @@ from .shader_binding_table import *
 from .pipeline import *
 from .denoiser import *
 from .opacity_micromap import *
-from .displacement_micromap import *
 from .logging_utility import Logger
 
