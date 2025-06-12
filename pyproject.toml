@@ -1,3 +1,31 @@
 [build-system]
-requires = ["setuptools", "wheel", "Cython>=0.29.22,<3", "numpy"]
+requires = ["setuptools", "wheel", "Cython>=0.29.22,<3", "numpy", "cupy-12"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "python-optix"
+description = "Python bindings to the OptiX raytracing engine by nvidia"
+authors = [
+    { name = "Felix Igelbrink", email = "felix.igelbrink@dfki.de" }
+]
+urls = { homepage = "https://github.com/mortacious/python-optix" }
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: POSIX :: Linux",
+]
+dependencies = [
+    'numpy'
+]
+
+[tool.setuptools]
+license-files = ["../LICENSE"]
+
+
+[tool.setuptools_scm]
+write_to = "optix/_version.py"
+version_scheme = "release-branch-semver"
