@@ -41,7 +41,7 @@ include = [
 [project.optional-dependencies]
 cupy = ["cupy"] # regular cupy (e.g. from conda)
 cupy-cuda12x = ["cupy-cuda12x"] # pip installable cupy
-examples = ["pillow", "pyopengl", "pyglfw", "pyimgui"] # additional deps for the examples
+examples = ["pillow", "pyopengl", "pyglfw", "pyimgui", "imageio"] # additional deps for the examples
 
 [project.urls]
 Homepage = "https://github.com/mortacious/python-optix"
