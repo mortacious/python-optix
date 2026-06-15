@@ -217,6 +217,9 @@ cdef class Pipeline(OptixContextObject):
     max_traversable_graph_depth: int, optional
         The maximum traversable graph depth in this pipeline. If omitted, a default value of 1 is used
     """
+    def __cinit__(self):
+        memset(&self._stack_sizes, 0, sizeof(self._stack_sizes))
+
     def __init__(self,
                  DeviceContext context,
                  PipelineCompileOptions compile_options,
@@ -276,7 +279,7 @@ cdef class Pipeline(OptixContextObject):
                               unsigned int max_dc_depth):
         """
         Compute the stack sizes using a conservative default algorithm. For documentation of the used algorithm refer to
-        the OptiX documentation at https://raytracing-docs.nvidia.com/optix7/guide/index.html#program_pipeline_creation#pipeline-stack-size.
+        the OptiX documentation at https://raytracing-docs.nvidia.com/optix9/guide/index.html#program_pipeline_creation#pipeline-stack-size.
         
         Parameters
         ----------
@@ -301,7 +304,7 @@ cdef class Pipeline(OptixContextObject):
                                           unsigned int max_dc_depth):
         """
         Compute optimized stack sizes. Refer to the OptiX documentation at 
-        https://raytracing-docs.nvidia.com/optix7/guide/index.html#program_pipeline_creation#pipeline-stack-size
+        https://raytracing-docs.nvidia.com/optix9/guide/index.html#program_pipeline_creation#pipeline-stack-size
         for details.
         
         Parameters
@@ -329,7 +332,7 @@ cdef class Pipeline(OptixContextObject):
                                        unsigned int max_dc_depth_from_state):
         """
         Compute optimized stack sizes. Refer to the OptiX documentation at 
-        https://raytracing-docs.nvidia.com/optix7/guide/index.html#program_pipeline_creation#pipeline-stack-size
+        https://raytracing-docs.nvidia.com/optix9/guide/index.html#program_pipeline_creation#pipeline-stack-size
         for details.
         
         Parameters
@@ -362,7 +365,7 @@ cdef class Pipeline(OptixContextObject):
                                                  object program_groups_closesthit_2):
         """
         Compute optimized stack sizes for simple path tracers (camera and shadow rays). Refer to the OptiX documentation at 
-        https://raytracing-docs.nvidia.com/optix7/guide/index.html#program_pipeline_creation#pipeline-stack-size
+        https://raytracing-docs.nvidia.com/optix9/guide/index.html#program_pipeline_creation#pipeline-stack-size
         for details.
         
         Parameters

@@ -884,6 +884,9 @@ cdef class AccelerationStructure(OptixContextObject):
     stream: cupy.cuda.Stream, optional
         Cuda stream to use. If None the default stream is used
     """
+    def __cinit__(self):
+        memset(&self._buffer_sizes, 0, sizeof(self._buffer_sizes))
+
     def __init__(self,
                  DeviceContext context,
                  build_inputs,

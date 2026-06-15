@@ -221,7 +221,7 @@ cdef class Module(OptixContextObject):
     """
     Class representing a Optix Cuda program that will be called during pipeline execution. Wraps the OptixModule struct.
 
-    TODO: support creating modules through nvcc instead of nvrtc as well to support the new optix-ir format in 7.5
+    TODO: support creating modules through nvcc instead of nvrtc as well to support the optix-ir format
 
     Parameters
     ----------

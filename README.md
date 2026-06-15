@@ -18,14 +18,18 @@ Only Linux is officially supported at the moment. Experimental windows support i
 ### Supported OptiX Versions
 
 Python-OptiX always supports the most recent version of the OptiX SDK. 
-The current version (1.1.0) therefore supports OptiX 7.7.0
+The current version supports OptiX **9.0.0** (ABI 105).
+
+**Requirements:**
+- NVIDIA driver R570 or later
+- CUDA Toolkit 12.0 or later
 
 ## Installation
 
 ### Dependencies
 
-Install a recent version of the [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads)
-as well as the [OptiX 7.7.0 SDK](https://developer.nvidia.com/optix/downloads/7.7.0/linux64-x86_64)
+Install a recent version of the [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (12.0+)
+as well as the [OptiX 9.0.0 SDK](https://developer.nvidia.com/designworks/optix/downloads/legacy)
 
 Make sure the CUDA header files are installed as well. 
 

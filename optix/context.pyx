@@ -43,7 +43,7 @@ cdef class DeviceContext(OptixObject):
         Function to call for logging. If None logging will be disabled
     log_callback_level: int
         The log callback level. Please refer to the Logger Class for an explanation of the levels or consult the OptiX
-        documentation at https://raytracing-docs.nvidia.com/optix7/api/html/group__optix__types.html#gafa74ebb0b1ab57289a4d5a080cd4c090
+        documentation at https://raytracing-docs.nvidia.com/optix9/api/html/group__optix__types.html#gafa74ebb0b1ab57289a4d5a080cd4c090
     validation_mode: bool
         Enable or disable validation mode
     """

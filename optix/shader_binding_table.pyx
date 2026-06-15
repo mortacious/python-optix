@@ -1,5 +1,6 @@
 # distutils: language = c++
 
+from libc.string cimport memset
 from .struct cimport SbtRecord
 from .struct import SbtRecord, array_to_device_memory
 from .common cimport optix_init
@@ -54,6 +55,9 @@ cdef class ShaderBindingTable(OptixObject):
         The stride of the records (size of one Record in bytes) if they cannot be determined from the record object (in case of a cupy.Memorypointer).
         In all other cases this parameter is ignored.
     """
+    def __cinit__(self):
+        memset(&self.sbt, 0, sizeof(self.sbt))
+
     def __init__(self,
                  stream=None,
                  raygen_record=None,
