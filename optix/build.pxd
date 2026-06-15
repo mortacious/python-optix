@@ -54,6 +54,7 @@ cdef extern from "optix.h" nogil:
     cdef struct OptixBuildInputInstanceArray:
         CUdeviceptr instances
         unsigned int numInstances
+        unsigned int instanceStride
 
 
     cdef struct OptixAabb:
@@ -86,6 +87,10 @@ cdef extern from "optix.h" nogil:
         OPTIX_PRIMITIVE_TYPE_FLAT_QUADRATIC_BSPLINE,
         OPTIX_PRIMITIVE_TYPE_SPHERE,
         OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BEZIER,
+        OPTIX_PRIMITIVE_TYPE_ROUND_QUADRATIC_BSPLINE_ROCAPS,
+        OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE_ROCAPS,
+        OPTIX_PRIMITIVE_TYPE_ROUND_CATMULLROM_ROCAPS,
+        OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BEZIER_ROCAPS,
         OPTIX_PRIMITIVE_TYPE_TRIANGLE,
 
 
@@ -113,6 +118,7 @@ cdef extern from "optix.h" nogil:
 
     cdef enum OptixIndicesFormat:
         OPTIX_INDICES_FORMAT_NONE,
+        OPTIX_INDICES_FORMAT_UNSIGNED_BYTE3,
         OPTIX_INDICES_FORMAT_UNSIGNED_SHORT3,
         OPTIX_INDICES_FORMAT_UNSIGNED_INT3
 
@@ -230,6 +236,7 @@ cdef extern from "optix.h" nogil:
         unsigned int visibilityMask
         unsigned int flags
         OptixTraversableHandle traversableHandle
+        unsigned int[2] pad
 
 
     cdef struct OptixRelocateInputInstanceArray:
@@ -331,55 +338,23 @@ cdef extern from "optix.h" nogil:
         unsigned int maxClusterCountPerArg
 
 
+    # These Args structs contain C bitfields which Cython cannot represent.
+    # They live in device memory and are passed via CUdeviceptr, so opaque
+    # declarations are sufficient.
     cdef struct OptixClusterAccelPrimitiveInfo:
-        unsigned int sbtIndex # 24 bits
-        unsigned int reserved # 5 bits
-        unsigned int primitiveFlags # 3 bits
+        pass
 
-    
     cdef struct OptixClusterAccelBuildInputTrianglesArgs:
-        unsigned int clusterId
-        unsigned int clusterFlags
-        unsigned int triangleCount # 9 bits
-        unsigned int vertexCount # 9 bits
-        unsigned int positionTruncateBitCount # 6 bits
-        unsigned int indexFormat # 4 bits
-        unsigned int opacityMicromapIndexFormat # 4 bits
-        OptixClusterAccelPrimitiveInfo basePrimitiveInfo
-        unsigned short indexBufferStrideInBytes
-        unsigned short vertexBufferStrideInBytes
-        unsigned short primitiveInfoBufferStrideInBytes
-        unsigned short opacityMicromapIndexBufferStrideInBytes
-        CUdeviceptr indexBuffer
-        CUdeviceptr vertexBuffer
-        CUdeviceptr primitiveInfoBuffer
-        CUdeviceptr opacityMicromapArray
-        CUdeviceptr opacityMicromapIndexBuffer
-        CUdeviceptr instantiationBoundingBoxLimit
+        pass
 
     cdef struct OptixClusterAccelBuildInputGridsArgs:
-        unsigned int baseClusterId
-        unsigned int clusterFlags
-        OptixClusterAccelPrimitiveInfo basePrimitiveInfo
-        unsigned int positionTruncateBitCount # 6 bits
-        unsigned int reserved # 26 bits
-        unsigned char[2] dimensions
-        unsigned short reserved2
-
+        pass
 
     cdef struct OptixClusterAccelBuildInputTemplatesArgs:
-        unsigned int clusterIdOffset
-        unsigned int sbtIndexOffset
-        CUdeviceptr clusterTemplate
-        CUdeviceptr vertexBuffer
-        unsigned int vertexStrideInBytes
-        unsigned int reserved
-
+        pass
 
     cdef struct OptixClusterAccelBuildInputClustersArgs:
-        unsigned int clusterHandlesCount
-        unsigned int clusterHandlesBufferStrideInBytes
-        CUdeviceptr clusterHandlesBuffer
+        pass
 
 
     cdef enum OptixClusterAccelBuildType:
@@ -396,11 +371,6 @@ cdef extern from "optix.h" nogil:
         OptixClusterAccelBuildInputClusters clusters
         OptixClusterAccelBuildInputTriangles triangles
         OptixClusterAccelBuildInputGrids grids
-
-
-    cdef enum OptixDevicePropertyClusterAccelFlags:
-        OPTIX_DEVICE_PROPERTY_CLUSTER_ACCEL_FLAG_NONE
-        OPTIX_DEVICE_PROPERTY_CLUSTER_ACCEL_FLAG_STANDARD
 
 
     OptixResult optixAccelComputeMemoryUsage(OptixDeviceContext context,
@@ -564,3 +534,19 @@ cdef class AccelerationStructure(OptixContextObject):
     cdef void _init_build_inputs(self, build_inputs, vector[OptixBuildInput]& ret)
     cdef void _init_accel_options(self, size_t num_build_inputs, unsigned int build_flags, OptixBuildOperation operation, vector[OptixAccelBuildOptions]& ret)
     cdef void build(self, build_inputs, stream=*)
+
+
+cdef class ClusterAccelBuildInputTriangles(OptixObject):
+    cdef OptixClusterAccelBuildInputTriangles build_input
+
+
+cdef class ClusterAccelBuildInputGrids(OptixObject):
+    cdef OptixClusterAccelBuildInputGrids build_input
+
+
+cdef class ClusterAccelBuildInputClusters(OptixObject):
+    cdef OptixClusterAccelBuildInputClusters build_input
+
+
+cdef class ClusterAcceleration(OptixContextObject):
+    cdef OptixAccelBufferSizes _buffer_sizes

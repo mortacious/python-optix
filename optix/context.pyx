@@ -1,6 +1,7 @@
 # distutils: language = c++
 
 from .common cimport optix_check_return, optix_init
+from libc.string cimport memset
 from libc.stdint cimport uintptr_t, int32_t
 import cupy as cp
 
@@ -52,6 +53,7 @@ cdef class DeviceContext(OptixObject):
                  int32_t log_callback_level=1,
                  bint validation_mode=False):
         cdef OptixDeviceContextOptions options
+        memset(&options, 0, sizeof(options))
         if device is None:
             device = cp.cuda.Device(0) # use the default (0) device
 
@@ -233,6 +235,30 @@ cdef class DeviceContext(OptixObject):
         The maximum offset in the ShaderBindingTable
         """
         return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_SBT_OFFSET)
+
+    @property
+    def shader_execution_reordering(self):
+        return self._get_property(OPTIX_DEVICE_PROPERTY_SHADER_EXECUTION_REORDERING)
+
+    @property
+    def coop_vec(self):
+        return self._get_property(OPTIX_DEVICE_PROPERTY_COOP_VEC)
+
+    @property
+    def cluster_accel(self):
+        return self._get_property(OPTIX_DEVICE_PROPERTY_CLUSTER_ACCEL)
+
+    @property
+    def max_cluster_vertices(self):
+        return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_CLUSTER_VERTICES)
+
+    @property
+    def max_cluster_triangles(self):
+        return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_CLUSTER_TRIANGLES)
+
+    @property
+    def max_structured_grid_resolution(self):
+        return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_STRUCTURED_GRID_RESOLUTION)
 
     @property
     def device(self):

@@ -9,6 +9,7 @@ from libc.stdlib cimport malloc, free
 from libcpp.vector cimport vector
 from libc.stdint cimport uintptr_t
 
+from libc.string cimport memset
 from .struct cimport LaunchParamsRecord
 from .struct import LaunchParamsRecord
 from .shader_binding_table cimport ShaderBindingTable
@@ -47,7 +48,13 @@ class PrimitiveTypeFlags(IntFlag):
     ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
     ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR
     ROUND_CATMULLROM = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CATMULLROM
+    FLAT_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_FLAT_QUADRATIC_BSPLINE
     SPHERE = OPTIX_PRIMITIVE_TYPE_FLAGS_SPHERE
+    ROUND_CUBIC_BEZIER = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BEZIER
+    ROUND_QUADRATIC_BSPLINE_ROCAPS = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE_ROCAPS
+    ROUND_CUBIC_BSPLINE_ROCAPS = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE_ROCAPS
+    ROUND_CATMULLROM_ROCAPS = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CATMULLROM_ROCAPS
+    ROUND_CUBIC_BEZIER_ROCAPS = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BEZIER_ROCAPS
     TRIANGLE = <unsigned int>OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE # fixes negative number error
 
 
@@ -68,6 +75,9 @@ cdef class PipelineCompileOptions(OptixObject):
     """
     DEFAULT_MAX_PAYLOAD_VALUE_COUNT = OPTIX_COMPILE_DEFAULT_MAX_PAYLOAD_VALUE_COUNT
 
+    def __cinit__(self):
+        memset(&self.compile_options, 0, sizeof(self.compile_options))
+
     def __init__(self,
                  uses_motion_blur=False,
                  traversable_graph_flags = TraversableGraphFlags.ALLOW_ANY,
@@ -76,7 +86,8 @@ cdef class PipelineCompileOptions(OptixObject):
                  exception_flags = ExceptionFlags.NONE,
                  pipeline_launch_params_variable_name = "params",
                  uses_primitive_type_flags = PrimitiveTypeFlags.DEFAULT,
-                 allow_opacity_micromaps=False):
+                 allow_opacity_micromaps=False,
+                 allow_clustered_geometry=False):
         self.uses_motion_blur = uses_motion_blur
         self.traversable_graph_flags = traversable_graph_flags
         self.num_payload_values = num_payload_values
@@ -85,6 +96,7 @@ cdef class PipelineCompileOptions(OptixObject):
         self.pipeline_launch_params_variable_name = pipeline_launch_params_variable_name
         self.uses_primitive_type_flags = uses_primitive_type_flags
         self.allow_opacity_micromaps = allow_opacity_micromaps
+        self.allow_clustered_geometry = allow_clustered_geometry
 
     @property
     def uses_motion_blur(self):
@@ -154,6 +166,14 @@ cdef class PipelineCompileOptions(OptixObject):
         self.compile_options.allowOpacityMicromaps = allow
 
     @property
+    def allow_clustered_geometry(self):
+        return self.compile_options.allowClusteredGeometry
+
+    @allow_clustered_geometry.setter
+    def allow_clustered_geometry(self, allow):
+        self.compile_options.allowClusteredGeometry = allow
+
+    @property
     def c_obj(self):
         return <size_t>&self.compile_options
 
@@ -162,6 +182,9 @@ cdef class PipelineLinkOptions(OptixObject):
     """
     Class wrapping the OptixPipelineLinkOptions struct.
     """
+    def __cinit__(self):
+        memset(&self.link_options, 0, sizeof(self.link_options))
+
     def __init__(self, unsigned int max_trace_depth = 1):
         self.link_options.maxTraceDepth = max_trace_depth
 

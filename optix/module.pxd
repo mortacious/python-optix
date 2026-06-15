@@ -63,7 +63,7 @@ cdef extern from "optix_includes.h" nogil:
         const OptixModuleCompileBoundValueEntry* boundValues
         unsigned int numBoundValues
         unsigned int numPayloadTypes
-        OptixPayloadType* payloadTypes
+        const OptixPayloadType* payloadTypes
 
     cdef struct OptixBuiltinISOptions:
         OptixPrimitiveType builtinISModuleType

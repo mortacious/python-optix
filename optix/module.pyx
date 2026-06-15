@@ -10,6 +10,7 @@ from .pipeline cimport PipelineCompileOptions
 from .pipeline import CompileDebugLevel
 from .build import PrimitiveType, BuildFlags, CurveEndcapFlags
 from .common import ensure_iterable
+from libc.string cimport memset
 from libc.stdint cimport uintptr_t
 from libcpp.vector cimport vector
 
@@ -55,7 +56,7 @@ class PayloadSemantics(IntFlag):
     IS_WRITE = OPTIX_PAYLOAD_SEMANTICS_IS_WRITE,
     IS_READ_WRITE = OPTIX_PAYLOAD_SEMANTICS_IS_READ_WRITE
 
-class ModuleCompileState(IntFlag):
+class ModuleCompileState(IntEnum):
     NOT_STARTED = OPTIX_MODULE_COMPILE_STATE_NOT_STARTED,
     STARTED = OPTIX_MODULE_COMPILE_STATE_STARTED,
     IMPENDING_FAILURE = OPTIX_MODULE_COMPILE_STATE_IMPENDING_FAILURE,
@@ -123,6 +124,9 @@ cdef class ModuleCompileOptions(OptixObject):
     DEFAULT_MAX_REGISTER_COUNT = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT
     DEFAULT_MAX_PAYLOAD_TYPE_COUNT = OPTIX_COMPILE_DEFAULT_MAX_PAYLOAD_TYPE_COUNT
     DEFAULT_MAX_PAYLOAD_VALUE_COUNT = OPTIX_COMPILE_DEFAULT_MAX_PAYLOAD_VALUE_COUNT
+
+    def __cinit__(self):
+        memset(&self.compile_options, 0, sizeof(self.compile_options))
 
     def __init__(self,
                  max_register_count=DEFAULT_MAX_REGISTER_COUNT,
@@ -196,6 +200,9 @@ cdef _is_ptx(src):
 
 
 cdef class BuiltinISOptions(OptixObject):
+    def __cinit__(self):
+        memset(&self.options, 0, sizeof(self.options))
+
     def __init__(self,
                  primitive_type,
                  build_flags,

@@ -28,7 +28,13 @@ cdef extern from "optix_includes.h" nogil:
         OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
         OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR,
         OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CATMULLROM,
+        OPTIX_PRIMITIVE_TYPE_FLAGS_FLAT_QUADRATIC_BSPLINE,
         OPTIX_PRIMITIVE_TYPE_FLAGS_SPHERE,
+        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BEZIER,
+        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE_ROCAPS,
+        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE_ROCAPS,
+        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CATMULLROM_ROCAPS,
+        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BEZIER_ROCAPS,
         OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE,
 
 
@@ -49,6 +55,7 @@ cdef extern from "optix_includes.h" nogil:
         const char * pipelineLaunchParamsVariableName
         unsigned int usesPrimitiveTypeFlags
         int allowOpacityMicromaps
+        int allowClusteredGeometry
 
 
     cdef struct OptixPipelineLinkOptions:
