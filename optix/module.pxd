@@ -1,6 +1,6 @@
 from .base cimport OptixObject
 from .common cimport OptixResult, OptixModule
-from .context cimport OptixDeviceContext, OptixContextObject
+from .context cimport OptixDeviceContext, OptixContextObject, OptixCreationFlags
 from .build cimport OptixPrimitiveType
 from .pipeline cimport OptixPipelineCompileOptions, OptixCompileDebugLevel
 from libcpp.vector cimport vector
@@ -64,6 +64,7 @@ cdef extern from "optix_includes.h" nogil:
         unsigned int numBoundValues
         unsigned int numPayloadTypes
         const OptixPayloadType* payloadTypes
+        OptixModule baseModule
 
     cdef struct OptixBuiltinISOptions:
         OptixPrimitiveType builtinISModuleType
@@ -120,6 +121,19 @@ cdef extern from "optix_includes.h" nogil:
                                  unsigned int maxNumAdditionalTasks,
                                  unsigned int *numAdditionalTasksCreated)
 
+    cdef OptixResult optixModuleCancelCreation(OptixModule module, OptixCreationFlags flags)
+
+    cdef OptixResult optixTaskGetSerializationKey(OptixTask task, void * key, size_t * size)
+
+    cdef OptixResult optixTaskSerializeOutput(OptixTask task, void * data, size_t * size)
+
+    cdef OptixResult optixTaskDeserializeOutput(OptixTask task,
+                                                const void * data,
+                                                size_t size,
+                                                OptixTask * additionalTasks,
+                                                unsigned int maxNumAdditionalTasks,
+                                                unsigned int * numAdditionalTasksCreated)
+
 
 
 cdef class BuiltinISOptions(OptixObject):
@@ -135,7 +149,9 @@ cdef class ModuleCompileOptions(OptixObject):
     cdef OptixModuleCompileOptions compile_options
     cdef vector[OptixPayloadType] payload_types
     cdef vector[vector[unsigned int]] payload_values # WTF!
+    cdef Module _base_module
 
 cdef class Task(OptixObject):
     cdef OptixTask task
     cdef Module module
+    cdef list _wrap_tasks(self, vector[OptixTask]& c_tasks, unsigned int count)

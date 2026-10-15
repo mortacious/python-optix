@@ -264,6 +264,39 @@ cdef class DeviceContext(OptixObject):
         return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_STRUCTURED_GRID_RESOLUTION)
 
     @property
+    def max_cluster_sbt_index(self):
+        """
+        The maximum sbt index allowed in a cluster acceleration structure (CLAS) build
+        """
+        return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_CLUSTER_SBT_INDEX)
+
+    @property
+    def max_clusters_per_gas(self):
+        """
+        The maximum number of clusters (CLAS) as input to a single GAS
+        """
+        return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_CLUSTERS_PER_GAS)
+
+    def cancel_creations(self, bint block=False):
+        """
+        Cancel the task-based creation of all modules associated with this context.
+
+        Parameters
+        ----------
+        block: bool, optional
+            If True, block until the cancellation is effective.
+
+        Notes
+        -----
+        With driver 595.71.05, optixDeviceContextCancelCreations segfaults once the context has
+        actually compiled a module (OptiX disk cache miss). This is reproducible in plain C++,
+        prefer Module.cancel_creation for individual modules.
+        """
+        cdef OptixCreationFlags flags = OPTIX_CREATION_FLAG_BLOCK_UNTIL_EFFECTIVE if block else OPTIX_CREATION_FLAG_NONE
+        with nogil:
+            optix_check_return(optixDeviceContextCancelCreations(self.c_context, flags))
+
+    @property
     def device(self):
         """
         The device of this context

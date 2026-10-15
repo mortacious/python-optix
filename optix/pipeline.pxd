@@ -53,6 +53,7 @@ cdef extern from "optix_includes.h" nogil:
         int numAttributeValues
         unsigned int exceptionFlags
         const char * pipelineLaunchParamsVariableName
+        size_t pipelineLaunchParamsSizeInBytes
         unsigned int usesPrimitiveTypeFlags
         int allowOpacityMicromaps
         int allowClusteredGeometry
@@ -60,6 +61,17 @@ cdef extern from "optix_includes.h" nogil:
 
     cdef struct OptixPipelineLinkOptions:
         unsigned int maxTraceDepth
+        unsigned int maxContinuationCallableDepth
+        unsigned int maxDirectCallableDepthFromState
+        unsigned int maxDirectCallableDepthFromTraversal
+        unsigned int maxTraversableGraphDepth
+
+
+    cdef enum OptixPipelineSymbolMemcpyKind:
+        OPTIX_PIPELINE_SYMBOL_MEMCPY_KIND_FROM_DEVICE,
+        OPTIX_PIPELINE_SYMBOL_MEMCPY_KIND_FROM_HOST,
+        OPTIX_PIPELINE_SYMBOL_MEMCPY_KIND_TO_DEVICE,
+        OPTIX_PIPELINE_SYMBOL_MEMCPY_KIND_TO_HOST
 
 
     ctypedef struct OptixProgramGroup:
@@ -84,6 +96,23 @@ cdef extern from "optix_includes.h" nogil:
                                                unsigned int directCallableStackSizeFromState,
                                                unsigned int continuationStackSize,
                                                unsigned int maxTraversableGraphDepth)
+
+
+    cdef OptixResult optixPipelineSetStackSizeFromCallDepths(OptixPipeline pipeline,
+                                                             unsigned int maxTraceDepth,
+                                                             unsigned int maxContinuationCallableDepth,
+                                                             unsigned int maxDirectCallableDepthFromState,
+                                                             unsigned int maxDirectCallableDepthFromTraversal,
+                                                             unsigned int maxTraversableGraphDepth)
+
+
+    cdef OptixResult optixPipelineSymbolMemcpyAsync(OptixPipeline pipeline,
+                                                    const char * name,
+                                                    void * mem,
+                                                    size_t sizeInBytes,
+                                                    size_t offsetInBytes,
+                                                    OptixPipelineSymbolMemcpyKind kind,
+                                                    CUstream stream)
 
 
 

@@ -258,7 +258,13 @@ cdef class Denoiser(OptixContextObject):
                aov_types: typ.Optional[typ.Union[typ.Sequence[DenoiserAOVType], DenoiserAOVType]] = None,
                blend_factor: float = 0.0,
                stream: typ.Optional[cp.cuda.Stream] = None,
-               temporal_use_previous_layer: bool = False):
+               temporal_use_previous_layer: bool = False,
+               flow_mul: typ.Optional[typ.Tuple[float, float]] = None):
+        """
+        flow_mul: tuple(float, float), optional
+            Multiplication factors (x, y) applied to the motion vectors of the flow guide layer.
+            If None or zero, the motion vectors are not scaled.
+        """
 
         accepted_input_types = (PixelFormat.FLOAT3, PixelFormat.FLOAT4, PixelFormat.HALF3, PixelFormat.HALF4)
         inputs = [Image2D(inp, require_type=accepted_input_types) for inp in ensure_iterable(inputs)]
@@ -341,6 +347,8 @@ cdef class Denoiser(OptixContextObject):
         params.hdrAverageColor = <CUdeviceptr>self._d_avg_color.ptr if self._d_avg_color is not None else 0
         params.blendFactor = blend_factor
         params.temporalModeUsePreviousLayers = 1 if temporal_use_previous_layer and temporal_mode else 0
+        if flow_mul is not None:
+            params.flowMulX, params.flowMulY = flow_mul
 
         cdef uintptr_t c_stream = 0
 

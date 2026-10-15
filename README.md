@@ -18,56 +18,64 @@ Only Linux is officially supported at the moment. Experimental windows support i
 ### Supported OptiX Versions
 
 Python-OptiX always supports the most recent version of the OptiX SDK. 
-The current version supports OptiX **9.0.0** (ABI 105).
+The current version supports OptiX **9.1.0** (ABI 118).
 
 **Requirements:**
-- NVIDIA driver R570 or later
+- NVIDIA driver R590 or later
 - CUDA Toolkit 12.0 or later
+- [CuPy](https://cupy.dev)
 
 ## Installation
 
 ### Dependencies
 
 Install a recent version of the [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (12.0+)
-as well as the [OptiX 9.0.0 SDK](https://developer.nvidia.com/designworks/optix/downloads/legacy)
-
-Make sure the CUDA header files are installed as well. 
+and make sure the CUDA header files are installed as well.
 
 Note, that for some variants of the CUDA Toolkit, 
 like the one installed by the `conda` package manager, all required headers are not installed by default. 
 `conda`-environments require installation of the additional `cudatoolkit-dev` package in 
 order for this package to work.
 
+The OptiX SDK itself does not need to be installed: the OptiX headers matching the supported version are
+downloaded automatically from the [NVIDIA/optix-dev](https://github.com/NVIDIA/optix-dev) repository
+(using `curl`), both during the build and on first use at runtime, where they are cached in
+`~/.cache/python-optix/optix-dev-9.1.0`. On machines without network access, extract the
+`v9.1.0` release of that repository to this location beforehand.
+
 ### Environment
 
-`python-optix` requires both the OptiX as well as the CUDA include path during setup as well as runtime 
-to compile the CUDA kernels. Therefore, it is necessary to either add both locations to the system `PATH`
-or set the `CUDA_PATH` and `OPTIX_PATH` variables to the respective locations.
-
-The setup additionally has the option to embed the OptiX header files into the `python-optix` installation. 
-If the variable `OPTIX_EMBED_HEADERS` is set to `1`, the setup will copy the headers from the 
-OptiX SDK directory into the generated wheel.
-
-If this option was chosen during setup, setting the `OPTIX_PATH` variable is no longer necessary as the 
-embedded headers will be utilized then instead.
+`python-optix` requires the CUDA include path during setup as well as at runtime to compile the CUDA kernels. 
+If CUDA is not found automatically, set the `CUDA_PATH` variable to the location of the CUDA Toolkit.
 
 ### Using pip
 ```
-export OPTIX_PATH=/path/to/optix
-export CUDA_PATH=/path/to/cuda_toolkit
-export OPTIX_EMBED_HEADERS=1 # Optional: embedd the optix headers into the package
-python -m pip install python-optix
+export CUDA_PATH=/path/to/cuda_toolkit # if not found automatically
+python -m pip install python-optix[cupy-cuda12x]
 ```
 
 ### From source
 ```
 git clone https://github.com/mortacious/python-optix.git
 cd python-optix
-export OPTIX_PATH=/path/to/optix
-export CUDA_PATH=/path/to/cuda_toolkit
-export OPTIX_EMBED_HEADERS=1 # embed the optix headers into the package
+export CUDA_PATH=/path/to/cuda_toolkit # if not found automatically
 python -m pip install [-e] .
 ```
+
+## Examples
+
+The `examples` directory contains Python ports of several OptiX SDK samples
+(hello, triangle, spheres, opacity micromaps, dynamic geometry and materials, the denoiser and
+task-based module compilation). Their additional dependencies can be installed with
+```
+python -m pip install python-optix[examples]
+```
+
+## Known Issues
+
+- With driver 595.71.05, `DeviceContext.cancel_creations` (`optixDeviceContextCancelCreations`) crashes 
+  inside the driver once the context has actually compiled a module. Use `Module.cancel_creation` 
+  for individual modules instead.
 
 ## Contributing
 Contributions to Python Optix are welcome! If you find a bug or have a feature request, please open an issue on GitHub. If you want to contribute code, please fork the repository and submit a pull request.

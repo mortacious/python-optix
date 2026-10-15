@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import numpy
 
-OPTIX_COMPATIBLE_VERSION = (9, 0, 0)
+OPTIX_COMPATIBLE_VERSION = (9, 1, 0)
 
 
 # standalone import of a module (https://stackoverflow.com/a/58423785)

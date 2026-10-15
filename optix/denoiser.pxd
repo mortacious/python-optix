@@ -38,6 +38,8 @@ cdef extern from "optix_includes.h" nogil:
         float        blendFactor
         CUdeviceptr  hdrAverageColor
         unsigned int temporalModeUsePreviousLayers
+        float        flowMulX
+        float        flowMulY
 
 
     cdef enum OptixPixelFormat:
