@@ -41,7 +41,7 @@ if __name__ == "__main__":
         ctx.cache_enabled = False
 
     # compile the file content to ptx in case a .cu file is given
-    ptx = ox.Module.compile_cuda_ptx(args.file[0])
+    ptx = ox.Module(ctx, None).compile_cuda_ptx(args.file[0])
 
     pipeline_options = ox.PipelineCompileOptions(num_payload_values=0,
                                                  num_attribute_values=args.num_attributes)

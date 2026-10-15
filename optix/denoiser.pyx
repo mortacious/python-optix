@@ -278,15 +278,17 @@ cdef class Denoiser(OptixContextObject):
 
         cdef OptixDenoiserGuideLayer guide_layer
         memset(&guide_layer, 0, sizeof(guide_layer))
-        guide_layer.albedo = (<Image2D>albedo).image
-        guide_layer.normal = (<Image2D>normals).image
+        if albedo is not None:
+            guide_layer.albedo = (<Image2D>albedo).image
+        if normals is not None:
+            guide_layer.normal = (<Image2D>normals).image
 
         temporal_mode = self.model_kind.temporal_mode()
         if temporal_mode:
             if flow is None:
                 raise ValueError("Flow is expected for temporal mode.")
             flow = Image2D(flow, require_type=(PixelFormat.HALF2, PixelFormat.FLOAT2))
-            guide_layer.flow = <Image2D>flow.image
+            guide_layer.flow = (<Image2D>flow).image
 
             if prev_outputs is None:
                 raise ValueError("Previous outputs are expected for temporal mode. For the first frame use a list of None values.")
@@ -298,7 +300,7 @@ cdef class Denoiser(OptixContextObject):
 
             if flow_trustworthiness is not None:
                 flow_trustworthiness = Image2D(flow_trustworthiness, require_type=(PixelFormat.HALF1, PixelFormat.FLOAT1))
-                guide_layer.flowTrustworthiness = <Image2D>flow_trustworthiness.image
+                guide_layer.flowTrustworthiness = (<Image2D>flow_trustworthiness).image
 
         # prepare the outputs
         if outputs is not None:

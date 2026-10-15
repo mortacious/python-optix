@@ -3,6 +3,7 @@
 from .common cimport optix_check_return, optix_init
 from libc.string cimport memset
 from libc.stdint cimport uintptr_t, int32_t
+cimport cython
 import cupy as cp
 
 __all__ = ['optix_version', 'DeviceContext']
@@ -30,6 +31,8 @@ cdef void context_log_cb(unsigned int level, const char * tag, const char * mess
 cdef size_t MAXIMUM_LAUNCH_SIZE = 2**30
 
 
+# no_gc_clear: the log callback must stay alive until optixDeviceContextDestroy in __dealloc__
+@cython.no_gc_clear
 cdef class DeviceContext(OptixObject):
     """
     Represents an OptiX context on a single device. This class wraps the OptixDeviceContext struct.
@@ -279,6 +282,9 @@ cdef class DeviceContext(OptixObject):
         return f"device id {self._device.id}"
 
 
+# no_gc_clear: keep the context alive until the dependent OptiX object is destroyed in __dealloc__,
+# otherwise the GC may destroy the context first when both are part of a reference cycle
+@cython.no_gc_clear
 cdef class OptixContextObject(OptixObject):
     """
     Base class for all optix Classes depending on an active context

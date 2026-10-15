@@ -248,6 +248,7 @@ cdef class Module(OptixContextObject):
         super().__init__(context)
         cdef const char * c_ptx
         cdef unsigned int pipeline_payload_values, i
+        cdef OptixModule c_module = <OptixModule>NULL
 
         if compile_flags is None:
             compile_flags = _nvrtc_compile_flags_default
@@ -267,7 +268,9 @@ cdef class Module(OptixContextObject):
                                      len(ptx) + 1,
                                      NULL,
                                      NULL,
-                                     &self.module))
+                                     &c_module))
+            # only keep the handle on success, a failed creation may leave an invalid handle behind
+            self.module = c_module
     def __dealloc__(self):
         if <uintptr_t> self.module != 0:
             optix_check_return(optixModuleDestroy(self.module))
