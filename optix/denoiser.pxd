@@ -38,6 +38,8 @@ cdef extern from "optix_includes.h" nogil:
         float        blendFactor
         CUdeviceptr  hdrAverageColor
         unsigned int temporalModeUsePreviousLayers
+        float        flowMulX
+        float        flowMulY
 
 
     cdef enum OptixPixelFormat:
@@ -51,6 +53,7 @@ cdef extern from "optix_includes.h" nogil:
         OPTIX_PIXEL_FORMAT_FLOAT4
         OPTIX_PIXEL_FORMAT_UCHAR3
         OPTIX_PIXEL_FORMAT_UCHAR4
+        OPTIX_PIXEL_FORMAT_INTERNAL_GUIDE_LAYER
 
     cdef struct OptixImage2D:
         CUdeviceptr data

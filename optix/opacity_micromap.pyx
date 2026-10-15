@@ -200,6 +200,7 @@ cdef class OpacityMicromapInput(OptixObject):
         else:
             subdivision_level = (np.log2(buffer.shape[1]) / 2)
             buffer, fmt = bake_opacity_micromap(buffer, format)
+            format = fmt
 
         self.buffer = buffer
         self.c_format = <OptixOpacityMicromapFormat>format.value
@@ -264,6 +265,7 @@ cdef class OpacityMicromapArray(OptixContextObject):
                   else inp for inp in ensure_iterable(inputs)]
 
         cdef OptixOpacityMicromapArrayBuildInput build_input
+        memset(&build_input, 0, sizeof(build_input))
         build_input.flags = self._build_flags
 
         cdef size_t inputs_size_in_bytes = 0
@@ -330,6 +332,7 @@ cdef class OpacityMicromapArray(OptixContextObject):
         build_input.perMicromapDescStrideInBytes = 0
 
         cdef OptixMicromapBufferSizes build_sizes
+        memset(&build_sizes, 0, sizeof(build_sizes))
 
         optix_check_return(optixOpacityMicromapArrayComputeMemoryUsage(self.context.c_context,
                                                                        &build_input,
@@ -341,6 +344,7 @@ cdef class OpacityMicromapArray(OptixContextObject):
         d_temp_buffer = cp.cuda.alloc(build_sizes.tempSizeInBytes)
 
         cdef OptixMicromapBuffers micromap_buffers
+        memset(&micromap_buffers, 0, sizeof(micromap_buffers))
 
         micromap_buffers.tempSizeInBytes = build_sizes.tempSizeInBytes
         micromap_buffers.temp = d_temp_buffer.ptr
@@ -401,7 +405,7 @@ cdef class OpacityMicromapArray(OptixContextObject):
         memset(&micromap_info, 0, sizeof(OptixRelocationInfo))  # init struct to 0
 
         optix_check_return(optixOpacityMicromapArrayGetRelocationInfo(self.context.c_context,
-                                                                      self.d_micromap_array_buffer, &micromap_info))
+                                                                      self.d_micromap_array_buffer.ptr, &micromap_info))
 
         if device is None:
             device = self.context
@@ -423,7 +427,7 @@ cdef class OpacityMicromapArray(OptixContextObject):
         result._build_flags = self._build_flags
         result._buffer_size = self._buffer_size
         # TODO: align this?
-        result._gas_buffer = cp.cuda.alloc(result._buffer_size)
+        result.d_micromap_array_buffer = cp.cuda.alloc(result._buffer_size)
         cp.cuda.runtime.memcpy(result.d_micromap_array_buffer.ptr,
                                self.d_micromap_array_buffer.ptr,
                                result._buffer_size,
@@ -463,6 +467,9 @@ cdef class BuildInputOpacityMicromap(OptixObject):
         If the indexing_mode is INDEXED, this additional index buffer, specifiing an omm to use or the default value
         for each triangle in the geometry is required.
     """
+    def __cinit__(self):
+        memset(&self.build_input, 0, sizeof(self.build_input))
+
     def __init__(self,
                  OpacityMicromapArray omm_array,
                  usage_counts: Sequence[int],

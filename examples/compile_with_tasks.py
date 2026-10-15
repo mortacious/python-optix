@@ -11,8 +11,9 @@ log = logging.getLogger()
 
 
 if __name__ == "__main__":
-    if ox.optix_version()[1] < 4:
-        raise NotImplementedError("Parallel tasks are not implemented in optix versions < 7.3.")
+    version = ox.optix_version()
+    if version[0] < 7 or (version[0] == 7 and version[1] < 3):
+        raise NotImplementedError("Parallel tasks require OptiX 7.3 or later.")
 
     parser = argparse.ArgumentParser("Compile OptiX modules using parallel tasks")
     parser.add_argument('file', nargs=1, help="The input file (.ptx or .cu) to compile")
@@ -40,7 +41,7 @@ if __name__ == "__main__":
         ctx.cache_enabled = False
 
     # compile the file content to ptx in case a .cu file is given
-    ptx = ox.Module.compile_cuda_ptx(args.file[0])
+    ptx = ox.Module(ctx, None).compile_cuda_ptx(args.file[0])
 
     pipeline_options = ox.PipelineCompileOptions(num_payload_values=0,
                                                  num_attribute_values=args.num_attributes)

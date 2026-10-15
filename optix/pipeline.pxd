@@ -28,7 +28,13 @@ cdef extern from "optix_includes.h" nogil:
         OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
         OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR,
         OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CATMULLROM,
+        OPTIX_PRIMITIVE_TYPE_FLAGS_FLAT_QUADRATIC_BSPLINE,
         OPTIX_PRIMITIVE_TYPE_FLAGS_SPHERE,
+        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BEZIER,
+        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE_ROCAPS,
+        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE_ROCAPS,
+        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CATMULLROM_ROCAPS,
+        OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BEZIER_ROCAPS,
         OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE,
 
 
@@ -47,12 +53,25 @@ cdef extern from "optix_includes.h" nogil:
         int numAttributeValues
         unsigned int exceptionFlags
         const char * pipelineLaunchParamsVariableName
+        size_t pipelineLaunchParamsSizeInBytes
         unsigned int usesPrimitiveTypeFlags
         int allowOpacityMicromaps
+        int allowClusteredGeometry
 
 
     cdef struct OptixPipelineLinkOptions:
         unsigned int maxTraceDepth
+        unsigned int maxContinuationCallableDepth
+        unsigned int maxDirectCallableDepthFromState
+        unsigned int maxDirectCallableDepthFromTraversal
+        unsigned int maxTraversableGraphDepth
+
+
+    cdef enum OptixPipelineSymbolMemcpyKind:
+        OPTIX_PIPELINE_SYMBOL_MEMCPY_KIND_FROM_DEVICE,
+        OPTIX_PIPELINE_SYMBOL_MEMCPY_KIND_FROM_HOST,
+        OPTIX_PIPELINE_SYMBOL_MEMCPY_KIND_TO_DEVICE,
+        OPTIX_PIPELINE_SYMBOL_MEMCPY_KIND_TO_HOST
 
 
     ctypedef struct OptixProgramGroup:
@@ -77,6 +96,23 @@ cdef extern from "optix_includes.h" nogil:
                                                unsigned int directCallableStackSizeFromState,
                                                unsigned int continuationStackSize,
                                                unsigned int maxTraversableGraphDepth)
+
+
+    cdef OptixResult optixPipelineSetStackSizeFromCallDepths(OptixPipeline pipeline,
+                                                             unsigned int maxTraceDepth,
+                                                             unsigned int maxContinuationCallableDepth,
+                                                             unsigned int maxDirectCallableDepthFromState,
+                                                             unsigned int maxDirectCallableDepthFromTraversal,
+                                                             unsigned int maxTraversableGraphDepth)
+
+
+    cdef OptixResult optixPipelineSymbolMemcpyAsync(OptixPipeline pipeline,
+                                                    const char * name,
+                                                    void * mem,
+                                                    size_t sizeInBytes,
+                                                    size_t offsetInBytes,
+                                                    OptixPipelineSymbolMemcpyKind kind,
+                                                    CUstream stream)
 
 
 

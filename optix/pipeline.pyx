@@ -8,7 +8,10 @@ from enum import IntEnum, IntFlag
 from libc.stdlib cimport malloc, free
 from libcpp.vector cimport vector
 from libc.stdint cimport uintptr_t
+import numpy as np
+import cupy as cp
 
+from libc.string cimport memset
 from .struct cimport LaunchParamsRecord
 from .struct import LaunchParamsRecord
 from .shader_binding_table cimport ShaderBindingTable
@@ -47,7 +50,13 @@ class PrimitiveTypeFlags(IntFlag):
     ROUND_CUBIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE,
     ROUND_LINEAR = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_LINEAR
     ROUND_CATMULLROM = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CATMULLROM
+    FLAT_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAGS_FLAT_QUADRATIC_BSPLINE
     SPHERE = OPTIX_PRIMITIVE_TYPE_FLAGS_SPHERE
+    ROUND_CUBIC_BEZIER = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BEZIER
+    ROUND_QUADRATIC_BSPLINE_ROCAPS = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_QUADRATIC_BSPLINE_ROCAPS
+    ROUND_CUBIC_BSPLINE_ROCAPS = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE_ROCAPS
+    ROUND_CATMULLROM_ROCAPS = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CATMULLROM_ROCAPS
+    ROUND_CUBIC_BEZIER_ROCAPS = OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BEZIER_ROCAPS
     TRIANGLE = <unsigned int>OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE # fixes negative number error
 
 
@@ -68,6 +77,9 @@ cdef class PipelineCompileOptions(OptixObject):
     """
     DEFAULT_MAX_PAYLOAD_VALUE_COUNT = OPTIX_COMPILE_DEFAULT_MAX_PAYLOAD_VALUE_COUNT
 
+    def __cinit__(self):
+        memset(&self.compile_options, 0, sizeof(self.compile_options))
+
     def __init__(self,
                  uses_motion_blur=False,
                  traversable_graph_flags = TraversableGraphFlags.ALLOW_ANY,
@@ -75,16 +87,20 @@ cdef class PipelineCompileOptions(OptixObject):
                  num_attribute_values = 0,
                  exception_flags = ExceptionFlags.NONE,
                  pipeline_launch_params_variable_name = "params",
+                 pipeline_launch_params_size_in_bytes = 0,
                  uses_primitive_type_flags = PrimitiveTypeFlags.DEFAULT,
-                 allow_opacity_micromaps=False):
+                 allow_opacity_micromaps=False,
+                 allow_clustered_geometry=False):
         self.uses_motion_blur = uses_motion_blur
         self.traversable_graph_flags = traversable_graph_flags
         self.num_payload_values = num_payload_values
         self.num_attribute_values = num_attribute_values
         self.exception_flags = exception_flags
         self.pipeline_launch_params_variable_name = pipeline_launch_params_variable_name
+        self.pipeline_launch_params_size_in_bytes = pipeline_launch_params_size_in_bytes
         self.uses_primitive_type_flags = uses_primitive_type_flags
         self.allow_opacity_micromaps = allow_opacity_micromaps
+        self.allow_clustered_geometry = allow_clustered_geometry
 
     @property
     def uses_motion_blur(self):
@@ -138,6 +154,15 @@ cdef class PipelineCompileOptions(OptixObject):
         self.compile_options.pipelineLaunchParamsVariableName = <const char*>self._pipeline_launch_params_variable_name
 
     @property
+    def pipeline_launch_params_size_in_bytes(self):
+        return self.compile_options.pipelineLaunchParamsSizeInBytes
+
+    @pipeline_launch_params_size_in_bytes.setter
+    def pipeline_launch_params_size_in_bytes(self, size_t size):
+        # If not 0, OptiX checks that the size of the launch params variable in the device code matches this value
+        self.compile_options.pipelineLaunchParamsSizeInBytes = size
+
+    @property
     def uses_primitive_type_flags(self):
         return PrimitiveTypeFlags(self.compile_options.usesPrimitiveTypeFlags)
 
@@ -154,6 +179,14 @@ cdef class PipelineCompileOptions(OptixObject):
         self.compile_options.allowOpacityMicromaps = allow
 
     @property
+    def allow_clustered_geometry(self):
+        return self.compile_options.allowClusteredGeometry
+
+    @allow_clustered_geometry.setter
+    def allow_clustered_geometry(self, allow):
+        self.compile_options.allowClusteredGeometry = allow
+
+    @property
     def c_obj(self):
         return <size_t>&self.compile_options
 
@@ -162,8 +195,21 @@ cdef class PipelineLinkOptions(OptixObject):
     """
     Class wrapping the OptixPipelineLinkOptions struct.
     """
-    def __init__(self, unsigned int max_trace_depth = 1):
+    def __cinit__(self):
+        memset(&self.link_options, 0, sizeof(self.link_options))
+
+    def __init__(self,
+                 unsigned int max_trace_depth = 1,
+                 unsigned int max_continuation_callable_depth = 0,
+                 unsigned int max_direct_callable_depth_from_state = 0,
+                 unsigned int max_direct_callable_depth_from_traversal = 0,
+                 unsigned int max_traversable_graph_depth = 0):
         self.link_options.maxTraceDepth = max_trace_depth
+        self.link_options.maxContinuationCallableDepth = max_continuation_callable_depth
+        self.link_options.maxDirectCallableDepthFromState = max_direct_callable_depth_from_state
+        self.link_options.maxDirectCallableDepthFromTraversal = max_direct_callable_depth_from_traversal
+        # 0 means a default value based on the traversable graph flags of the pipeline compile options
+        self.link_options.maxTraversableGraphDepth = max_traversable_graph_depth
 
     @property
     def max_trace_depth(self):
@@ -172,6 +218,38 @@ cdef class PipelineLinkOptions(OptixObject):
     @max_trace_depth.setter
     def max_trace_depth(self, unsigned int max_trace_depth):
         self.link_options.maxTraceDepth = max_trace_depth
+
+    @property
+    def max_continuation_callable_depth(self):
+        return self.link_options.maxContinuationCallableDepth
+
+    @max_continuation_callable_depth.setter
+    def max_continuation_callable_depth(self, unsigned int depth):
+        self.link_options.maxContinuationCallableDepth = depth
+
+    @property
+    def max_direct_callable_depth_from_state(self):
+        return self.link_options.maxDirectCallableDepthFromState
+
+    @max_direct_callable_depth_from_state.setter
+    def max_direct_callable_depth_from_state(self, unsigned int depth):
+        self.link_options.maxDirectCallableDepthFromState = depth
+
+    @property
+    def max_direct_callable_depth_from_traversal(self):
+        return self.link_options.maxDirectCallableDepthFromTraversal
+
+    @max_direct_callable_depth_from_traversal.setter
+    def max_direct_callable_depth_from_traversal(self, unsigned int depth):
+        self.link_options.maxDirectCallableDepthFromTraversal = depth
+
+    @property
+    def max_traversable_graph_depth(self):
+        return self.link_options.maxTraversableGraphDepth
+
+    @max_traversable_graph_depth.setter
+    def max_traversable_graph_depth(self, unsigned int depth):
+        self.link_options.maxTraversableGraphDepth = depth
 
 
 ctypedef vector[unsigned int] uint_vector
@@ -194,6 +272,9 @@ cdef class Pipeline(OptixContextObject):
     max_traversable_graph_depth: int, optional
         The maximum traversable graph depth in this pipeline. If omitted, a default value of 1 is used
     """
+    def __cinit__(self):
+        memset(&self._stack_sizes, 0, sizeof(self._stack_sizes))
+
     def __init__(self,
                  DeviceContext context,
                  PipelineCompileOptions compile_options,
@@ -247,13 +328,41 @@ cdef class Pipeline(OptixContextObject):
                                                      continuation_stack_size,
                                                      self._max_traversable_graph_depth))
 
+    def set_stack_sizes_from_call_depths(self,
+                                         unsigned int max_trace_depth,
+                                         unsigned int max_cc_depth = 0,
+                                         unsigned int max_dc_depth_from_state = 0,
+                                         unsigned int max_dc_depth_from_traversal = 0,
+                                         max_traversable_graph_depth = None):
+        """
+        Let OptiX recompute the stack sizes of this pipeline from the given call depths.
+        This reconfigures the values initially given through the PipelineLinkOptions.
+
+        Parameters
+        ----------
+        max_trace_depth: int
+        max_cc_depth: int
+        max_dc_depth_from_state: int
+        max_dc_depth_from_traversal: int
+        max_traversable_graph_depth: int, optional
+            If omitted, the max_traversable_graph_depth of this pipeline is used.
+        """
+        if max_traversable_graph_depth is not None:
+            self._max_traversable_graph_depth = max_traversable_graph_depth
+        optix_check_return(optixPipelineSetStackSizeFromCallDepths(self.pipeline,
+                                                                   max_trace_depth,
+                                                                   max_cc_depth,
+                                                                   max_dc_depth_from_state,
+                                                                   max_dc_depth_from_traversal,
+                                                                   self._max_traversable_graph_depth))
+
     cpdef compute_stack_sizes(self,
                               unsigned int max_trace_depth,
                               unsigned int max_cc_depth,
                               unsigned int max_dc_depth):
         """
         Compute the stack sizes using a conservative default algorithm. For documentation of the used algorithm refer to
-        the OptiX documentation at https://raytracing-docs.nvidia.com/optix7/guide/index.html#program_pipeline_creation#pipeline-stack-size.
+        the OptiX documentation at https://raytracing-docs.nvidia.com/optix9/guide/index.html#program_pipeline_creation#pipeline-stack-size.
         
         Parameters
         ----------
@@ -278,7 +387,7 @@ cdef class Pipeline(OptixContextObject):
                                           unsigned int max_dc_depth):
         """
         Compute optimized stack sizes. Refer to the OptiX documentation at 
-        https://raytracing-docs.nvidia.com/optix7/guide/index.html#program_pipeline_creation#pipeline-stack-size
+        https://raytracing-docs.nvidia.com/optix9/guide/index.html#program_pipeline_creation#pipeline-stack-size
         for details.
         
         Parameters
@@ -306,7 +415,7 @@ cdef class Pipeline(OptixContextObject):
                                        unsigned int max_dc_depth_from_state):
         """
         Compute optimized stack sizes. Refer to the OptiX documentation at 
-        https://raytracing-docs.nvidia.com/optix7/guide/index.html#program_pipeline_creation#pipeline-stack-size
+        https://raytracing-docs.nvidia.com/optix9/guide/index.html#program_pipeline_creation#pipeline-stack-size
         for details.
         
         Parameters
@@ -339,7 +448,7 @@ cdef class Pipeline(OptixContextObject):
                                                  object program_groups_closesthit_2):
         """
         Compute optimized stack sizes for simple path tracers (camera and shadow rays). Refer to the OptiX documentation at 
-        https://raytracing-docs.nvidia.com/optix7/guide/index.html#program_pipeline_creation#pipeline-stack-size
+        https://raytracing-docs.nvidia.com/optix9/guide/index.html#program_pipeline_creation#pipeline-stack-size
         for details.
         
         Parameters
@@ -392,6 +501,74 @@ cdef class Pipeline(OptixContextObject):
     def __dealloc__(self):
         if <uintptr_t>self.pipeline != 0:
             optix_check_return(optixPipelineDestroy(self.pipeline))
+
+    def _symbol_memcpy(self, name, mem, bint to_symbol, size_t offset_in_bytes, stream):
+        cdef OptixPipelineSymbolMemcpyKind kind
+        cdef bint on_device = hasattr(mem, '__cuda_array_interface__')
+        if on_device:
+            if not mem.flags.c_contiguous:
+                raise ValueError("Device memory must be C-contiguous.")
+            ptr = mem.__cuda_array_interface__['data'][0]
+            kind = OPTIX_PIPELINE_SYMBOL_MEMCPY_KIND_FROM_DEVICE if to_symbol else OPTIX_PIPELINE_SYMBOL_MEMCPY_KIND_TO_DEVICE
+        else:
+            if not mem.flags.c_contiguous:
+                raise ValueError("Host memory must be C-contiguous.")
+            ptr = mem.__array_interface__['data'][0]
+            kind = OPTIX_PIPELINE_SYMBOL_MEMCPY_KIND_FROM_HOST if to_symbol else OPTIX_PIPELINE_SYMBOL_MEMCPY_KIND_TO_HOST
+
+        cdef bytes c_name = name.encode('ascii')
+        cdef const char* c_name_ptr = c_name
+        cdef void* c_mem = <void*><uintptr_t>ptr
+        cdef size_t c_size = mem.nbytes
+        cdef size_t c_stream = 0 if stream is None else stream.ptr
+        with nogil:
+            optix_check_return(optixPipelineSymbolMemcpyAsync(self.pipeline, c_name_ptr, c_mem, c_size,
+                                                              offset_in_bytes, kind, <CUstream>c_stream))
+        if not on_device:
+            # host memory may be released by the caller as soon as this function returns
+            (cp.cuda.Stream.null if stream is None else stream).synchronize()
+
+    def copy_to_symbol(self, name, value, size_t offset_in_bytes = 0, stream=None):
+        """
+        Copy data into a global variable (e.g. a __device__ or __constant__ variable) of this pipeline.
+
+        Parameters
+        ----------
+        name: str
+            The name of the global variable in the device code.
+        value: array_like
+            The data to copy. Either a device array (e.g. a cupy.ndarray) or anything convertible into a numpy array.
+            The number of bytes copied is value.nbytes.
+        offset_in_bytes: int, optional
+            The offset into the variable's memory.
+        stream: cupy.cuda.Stream, optional
+            The cuda stream to use for the copy. If None the default stream (0) will be used.
+        """
+        if not hasattr(value, '__cuda_array_interface__'):
+            value = np.ascontiguousarray(value)
+        self._symbol_memcpy(name, value, True, offset_in_bytes, stream)
+
+    def copy_from_symbol(self, name, out, size_t offset_in_bytes = 0, stream=None):
+        """
+        Copy data from a global variable (e.g. a __device__ or __constant__ variable) of this pipeline.
+
+        Parameters
+        ----------
+        name: str
+            The name of the global variable in the device code.
+        out: numpy.ndarray or cupy.ndarray
+            The C-contiguous array the data is copied into. The number of bytes copied is out.nbytes.
+        offset_in_bytes: int, optional
+            The offset into the variable's memory.
+        stream: cupy.cuda.Stream, optional
+            The cuda stream to use for the copy. If None the default stream (0) will be used.
+
+        Returns
+        -------
+        out: numpy.ndarray or cupy.ndarray
+        """
+        self._symbol_memcpy(name, out, False, offset_in_bytes, stream)
+        return out
 
     def launch(self, ShaderBindingTable sbt, tuple dimensions, LaunchParamsRecord params=None, stream=None):
         """

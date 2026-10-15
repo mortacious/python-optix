@@ -5,11 +5,12 @@ import os
 import warnings
 from .path_utility import cuda_include_path, optix_include_path
 from .common cimport optix_check_return, optix_init
-from .context cimport DeviceContext
+from .context cimport DeviceContext, OPTIX_CREATION_FLAG_NONE, OPTIX_CREATION_FLAG_BLOCK_UNTIL_EFFECTIVE
 from .pipeline cimport PipelineCompileOptions
 from .pipeline import CompileDebugLevel
 from .build import PrimitiveType, BuildFlags, CurveEndcapFlags
 from .common import ensure_iterable
+from libc.string cimport memset
 from libc.stdint cimport uintptr_t
 from libcpp.vector cimport vector
 
@@ -55,7 +56,7 @@ class PayloadSemantics(IntFlag):
     IS_WRITE = OPTIX_PAYLOAD_SEMANTICS_IS_WRITE,
     IS_READ_WRITE = OPTIX_PAYLOAD_SEMANTICS_IS_READ_WRITE
 
-class ModuleCompileState(IntFlag):
+class ModuleCompileState(IntEnum):
     NOT_STARTED = OPTIX_MODULE_COMPILE_STATE_NOT_STARTED,
     STARTED = OPTIX_MODULE_COMPILE_STATE_STARTED,
     IMPENDING_FAILURE = OPTIX_MODULE_COMPILE_STATE_IMPENDING_FAILURE,
@@ -108,12 +109,78 @@ cdef class Task(OptixObject):
             additional_tasks.resize(max_num_additional_tasks)
             optix_check_return(optixTaskExecute(self.task, additional_tasks.data(), max_num_additional_tasks, &additional_tasks_created))
 
+        return self._wrap_tasks(additional_tasks, additional_tasks_created)
+
+    cdef list _wrap_tasks(self, vector[OptixTask]& c_tasks, unsigned int count):
         cdef list tasks = []
-        for i in range(additional_tasks_created):
+        cdef Task t
+        cdef unsigned int i
+        for i in range(count):
             t = Task(self.module)
-            t.task = additional_tasks[i]
+            t.task = c_tasks[i]
             tasks.append(t)
         return tasks
+
+    @property
+    def serialization_key(self):
+        """
+        The serialization key of this Task as bytes. If it is empty, the Task is not serializable
+        and has to be executed through execute().
+        """
+        cdef size_t size = 0
+        optix_check_return(optixTaskGetSerializationKey(self.task, NULL, &size))
+        cdef bytearray key = bytearray(size)
+        cdef char* c_key = key
+        if size > 0:
+            optix_check_return(optixTaskGetSerializationKey(self.task, c_key, &size))
+        return bytes(key)
+
+    def serialize_output(self):
+        """
+        Serialize the output of this Task after it was executed, e.g. to store it in a cache under its serialization_key.
+
+        Returns
+        -------
+        data: bytes
+        """
+        cdef size_t size = 0
+        optix_check_return(optixTaskSerializeOutput(self.task, NULL, &size))
+        cdef bytearray data = bytearray(size)
+        cdef char* c_data = data
+        if size > 0:
+            optix_check_return(optixTaskSerializeOutput(self.task, c_data, &size))
+        return bytes(data)
+
+    def deserialize_output(self, const unsigned char[::1] data, max_additional_tasks=2):
+        """
+        Use a previously serialized output (see serialize_output) instead of executing this Task.
+        If more parallel work is found, it will be returned as a new list of Task objects.
+
+        Parameters
+        ----------
+        data: bytes
+            The serialized output of a Task with the same serialization_key.
+        max_additional_tasks: int
+            The maximum number of new Tasks to create from this one
+
+        Returns
+        -------
+        tasks: List[Task]
+            The newly created tasks if any
+        """
+        cdef vector[OptixTask] additional_tasks
+        cdef unsigned int additional_tasks_created = 0
+        cdef unsigned int max_num_additional_tasks = max_additional_tasks
+        cdef const void* c_data = NULL
+        cdef size_t size = data.shape[0]
+        if size > 0:
+            c_data = &data[0]
+
+        with nogil:
+            additional_tasks.resize(max_num_additional_tasks)
+            optix_check_return(optixTaskDeserializeOutput(self.task, c_data, size, additional_tasks.data(),
+                                                          max_num_additional_tasks, &additional_tasks_created))
+        return self._wrap_tasks(additional_tasks, additional_tasks_created)
 
 
 cdef class ModuleCompileOptions(OptixObject):
@@ -124,11 +191,16 @@ cdef class ModuleCompileOptions(OptixObject):
     DEFAULT_MAX_PAYLOAD_TYPE_COUNT = OPTIX_COMPILE_DEFAULT_MAX_PAYLOAD_TYPE_COUNT
     DEFAULT_MAX_PAYLOAD_VALUE_COUNT = OPTIX_COMPILE_DEFAULT_MAX_PAYLOAD_VALUE_COUNT
 
+    def __cinit__(self):
+        memset(&self.compile_options, 0, sizeof(self.compile_options))
+
     def __init__(self,
                  max_register_count=DEFAULT_MAX_REGISTER_COUNT,
                  opt_level=CompileOptimizationLevel.DEFAULT,
                  debug_level= CompileDebugLevel.DEFAULT,
-                 payload_types=None): #TODO add bound values
+                 payload_types=None,
+                 base_module=None): #TODO add bound values
+        self.base_module = base_module
         self.compile_options.maxRegisterCount = max_register_count
         self.compile_options.optLevel = opt_level.value
         self.compile_options.debugLevel = debug_level.value
@@ -176,6 +248,19 @@ cdef class ModuleCompileOptions(OptixObject):
     def debug_level(self, level):
         self.compile_options.debugLevel = level.value
 
+    @property
+    def base_module(self):
+        """
+        The base module for potential specialization, or None.
+        """
+        return self._base_module
+
+    @base_module.setter
+    def base_module(self, Module module):
+        # keep a reference so that the base module stays alive as long as these options
+        self._base_module = module
+        self.compile_options.baseModule = <OptixModule>NULL if module is None else module.module
+
 
 cdef tuple _nvrtc_compile_flags_default = ('-use_fast_math', '-default-device', '-std=c++11', '-rdc', 'true')
 
@@ -196,6 +281,9 @@ cdef _is_ptx(src):
 
 
 cdef class BuiltinISOptions(OptixObject):
+    def __cinit__(self):
+        memset(&self.options, 0, sizeof(self.options))
+
     def __init__(self,
                  primitive_type,
                  build_flags,
@@ -214,7 +302,7 @@ cdef class Module(OptixContextObject):
     """
     Class representing a Optix Cuda program that will be called during pipeline execution. Wraps the OptixModule struct.
 
-    TODO: support creating modules through nvcc instead of nvrtc as well to support the new optix-ir format in 7.5
+    TODO: support creating modules through nvcc instead of nvrtc as well to support the optix-ir format
 
     Parameters
     ----------
@@ -241,6 +329,7 @@ cdef class Module(OptixContextObject):
         super().__init__(context)
         cdef const char * c_ptx
         cdef unsigned int pipeline_payload_values, i
+        cdef OptixModule c_module = <OptixModule>NULL
 
         if compile_flags is None:
             compile_flags = _nvrtc_compile_flags_default
@@ -260,10 +349,26 @@ cdef class Module(OptixContextObject):
                                      len(ptx) + 1,
                                      NULL,
                                      NULL,
-                                     &self.module))
+                                     &c_module))
+            # only keep the handle on success, a failed creation may leave an invalid handle behind
+            self.module = c_module
     def __dealloc__(self):
         if <uintptr_t> self.module != 0:
             optix_check_return(optixModuleDestroy(self.module))
+
+    def cancel_creation(self, bint block=False):
+        """
+        Cancel the task-based creation of this module (see create_as_task).
+        Remaining tasks can still be executed but will return without doing any work.
+
+        Parameters
+        ----------
+        block: bool, optional
+            If True, block until the cancellation is effective.
+        """
+        cdef OptixCreationFlags flags = OPTIX_CREATION_FLAG_BLOCK_UNTIL_EFFECTIVE if block else OPTIX_CREATION_FLAG_NONE
+        with nogil:
+            optix_check_return(optixModuleCancelCreation(self.module, flags))
 
     @property
     def compile_state(self):

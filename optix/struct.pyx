@@ -85,7 +85,7 @@ cdef class _StructHelper:
         self._array = self._create(size)
 
         if values is not None:
-            for name, value in names, values:
+            for name, value in zip(names, values):
                 if value is not None:
                     self.__setitem__(name, value)
 

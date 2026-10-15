@@ -58,8 +58,11 @@ cdef extern from "optix_includes.h" nogil:
         OptixProgramGroupHitgroup hitgroup
 
 
-    cdef struct OptixProgramGroupOptions:
+    cdef struct OptixPayloadType:
         pass
+
+    cdef struct OptixProgramGroupOptions:
+        const OptixPayloadType* payloadType
 
     ctypedef struct OptixPipeline:
         pass

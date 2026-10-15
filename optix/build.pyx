@@ -16,6 +16,7 @@ optix_init()
 
 __all__ = ['GeometryFlags',
            'PrimitiveType',
+           'VertexFormat',
            'InstanceFlags',
            'BuildInputTriangleArray',
            'BuildInputCustomPrimitiveArray',
@@ -25,6 +26,13 @@ __all__ = ['GeometryFlags',
            'Instance',
            'AccelerationStructure',
            'CurveEndcapFlags',
+           'ClusterAccelBuildMode',
+           'ClusterAccelBuildFlags',
+           'ClusterAccelBuildType',
+           'ClusterAccelBuildInputTriangles',
+           'ClusterAccelBuildInputGrids',
+           'ClusterAccelBuildInputClusters',
+           'ClusterAcceleration',
            ]
 
 
@@ -49,6 +57,8 @@ class BuildFlags(IntFlag):
     PREFER_FAST_BUILD = OPTIX_BUILD_FLAG_PREFER_FAST_BUILD,
     ALLOW_RANDOM_VERTEX_ACCESS = OPTIX_BUILD_FLAG_ALLOW_RANDOM_VERTEX_ACCESS,
     ALLOW_RANDOM_INSTANCE_ACCESS = OPTIX_BUILD_FLAG_ALLOW_RANDOM_INSTANCE_ACCESS,
+    ALLOW_OPACITY_MICROMAP_UPDATE = OPTIX_BUILD_FLAG_ALLOW_OPACITY_MICROMAP_UPDATE,
+    ALLOW_DISABLE_OPACITY_MICROMAPS = OPTIX_BUILD_FLAG_ALLOW_DISABLE_OPACITY_MICROMAPS,
 
 
 class PrimitiveType(IntEnum):
@@ -63,7 +73,21 @@ class PrimitiveType(IntEnum):
     FLAT_QUADRATIC_BSPLINE = OPTIX_PRIMITIVE_TYPE_FLAT_QUADRATIC_BSPLINE
     SPHERE = OPTIX_PRIMITIVE_TYPE_SPHERE
     ROUND_CUBIC_BEZIER = OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BEZIER
+    ROUND_QUADRATIC_BSPLINE_ROCAPS = OPTIX_PRIMITIVE_TYPE_ROUND_QUADRATIC_BSPLINE_ROCAPS
+    ROUND_CUBIC_BSPLINE_ROCAPS = OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE_ROCAPS
+    ROUND_CATMULLROM_ROCAPS = OPTIX_PRIMITIVE_TYPE_ROUND_CATMULLROM_ROCAPS
+    ROUND_CUBIC_BEZIER_ROCAPS = OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BEZIER_ROCAPS
     TRIANGLE = OPTIX_PRIMITIVE_TYPE_TRIANGLE
+
+
+class VertexFormat(IntEnum):
+    NONE = OPTIX_VERTEX_FORMAT_NONE
+    FLOAT3 = OPTIX_VERTEX_FORMAT_FLOAT3
+    FLOAT2 = OPTIX_VERTEX_FORMAT_FLOAT2
+    HALF3 = OPTIX_VERTEX_FORMAT_HALF3
+    HALF2 = OPTIX_VERTEX_FORMAT_HALF2
+    SNORM16_3 = OPTIX_VERTEX_FORMAT_SNORM16_3
+    SNORM16_2 = OPTIX_VERTEX_FORMAT_SNORM16_2
 
 
 class CurveEndcapFlags(IntEnum):
@@ -135,6 +159,9 @@ cdef class BuildInputTriangleArray(BuildInputArray):
     primitive_index_offset: int
         The offset applied to the primitive index in device code
     """
+    def __cinit__(self):
+        memset(&self.build_input, 0, sizeof(self.build_input))
+
     def __init__(self,
                  vertex_buffers,
                  index_buffer = None,
@@ -294,6 +321,9 @@ cdef class BuildInputCustomPrimitiveArray(BuildInputArray):
     primitive_index_offset: int
         The offset applied to the primitive index in device code
     """
+    def __cinit__(self):
+        memset(&self.build_input, 0, sizeof(self.build_input))
+
     def __init__(self,
                  aabb_buffers,
                  num_sbt_records = 1,
@@ -384,6 +414,9 @@ cdef class BuildInputCurveArray(BuildInputArray):
     primitive_index_offset: int
         The offset applied to the primitive index in device code
     """
+    def __cinit__(self):
+        memset(&self.build_input, 0, sizeof(self.build_input))
+
     def __init__(self,
                  curve_type,
                  vertex_buffers,
@@ -409,7 +442,7 @@ cdef class BuildInputCurveArray(BuildInputArray):
         self.build_input.vertexStrideInBytes = self._d_vertex_buffers[0].strides[0]
         self.build_input.numVertices = shape[0]
 
-        self._d_width_buffers = [cp.asarray(wb, np.uint32) for wb in ensure_iterable(width_buffers)]
+        self._d_width_buffers = [cp.asarray(wb, np.float32) for wb in ensure_iterable(width_buffers)]
         assert len(self._d_width_buffers) == len(self._d_vertex_buffers)
         self._d_width_buffer_ptrs.reserve(len(self._d_width_buffers))
 
@@ -424,7 +457,7 @@ cdef class BuildInputCurveArray(BuildInputArray):
         self.build_input.widthStrideInBytes = self._d_width_buffers[0].strides[0]
 
         if normal_buffers is not None:
-            self._d_normal_buffers = [cp.asarray(nb, np.uint32) for nb in ensure_iterable(normal_buffers)]
+            self._d_normal_buffers = [cp.asarray(nb, np.float32) for nb in ensure_iterable(normal_buffers)]
             assert len(self._d_normal_buffers) == len(self._d_vertex_buffers)
             self._d_normal_buffer_ptrs.reserve(len(self._d_normal_buffers))
 
@@ -448,7 +481,7 @@ cdef class BuildInputCurveArray(BuildInputArray):
         if flags is None:
             self.build_input.flag = OPTIX_GEOMETRY_FLAG_NONE
         else:
-            self.build_input.flag = flags.valuesbtIndexOffsetBuffer
+            self.build_input.flag = flags.value
 
         self.build_input.primitiveIndexOffset = primitive_index_offset
 
@@ -486,6 +519,9 @@ cdef class BuildInputSphereArray(BuildInputArray):
         primitive_index_offset: int
             The offset applied to the primitive index in device code
         """
+    def __cinit__(self):
+        memset(&self.build_input, 0, sizeof(self.build_input))
+
     def __init__(self,
                  vertex_buffers,
                  radius_buffers,
@@ -591,6 +627,9 @@ cdef class Instance(OptixObject):
     visibility_mask: int
         The visibility mask used for culling.
     """
+    def __cinit__(self):
+        memset(&self.instance, 0, sizeof(self.instance))
+
     def __init__(self,
                  AccelerationStructure traversable,
                  unsigned int instance_id,
@@ -658,6 +697,9 @@ cdef class BuildInputInstanceArray(BuildInputArray):
     instances: list[Instance]
         A list of the Instances to use as input
     """
+    def __cinit__(self):
+        memset(&self.build_input, 0, sizeof(self.build_input))
+
     def __init__(self, instances):
         super().__init__(BuildInputType.INSTANCES)
         instances = ensure_iterable(instances)
@@ -842,6 +884,9 @@ cdef class AccelerationStructure(OptixContextObject):
     stream: cupy.cuda.Stream, optional
         Cuda stream to use. If None the default stream is used
     """
+    def __cinit__(self):
+        memset(&self._buffer_sizes, 0, sizeof(self._buffer_sizes))
+
     def __init__(self,
                  DeviceContext context,
                  build_inputs,
@@ -1220,9 +1265,338 @@ cdef class AccelerationStructure(OptixContextObject):
 
     @property
     def build_flags(self):
-        return BuildFlags(self.build_flags)
+        return BuildFlags(self._build_flags)
 
 
+class ClusterAccelBuildMode(IntEnum):
+    IMPLICIT_DESTINATIONS = OPTIX_CLUSTER_ACCEL_BUILD_MODE_IMPLICIT_DESTINATIONS
+    EXPLICIT_DESTINATIONS = OPTIX_CLUSTER_ACCEL_BUILD_MODE_EXPLICIT_DESTINATIONS
+    GET_SIZES = OPTIX_CLUSTER_ACCEL_BUILD_MODE_GET_SIZES
 
 
+class ClusterAccelBuildFlags(IntFlag):
+    NONE = OPTIX_CLUSTER_ACCEL_BUILD_FLAG_NONE
+    PREFER_FAST_TRACE = OPTIX_CLUSTER_ACCEL_BUILD_FLAG_PREFER_FAST_TRACE
+    PREFER_FAST_BUILD = OPTIX_CLUSTER_ACCEL_BUILD_FLAG_PREFER_FAST_BUILD
+    ALLOW_OPACITY_MICROMAPS = OPTIX_CLUSTER_ACCEL_BUILD_FLAG_ALLOW_OPACITY_MICROMAPS
+
+
+class ClusterAccelBuildType(IntEnum):
+    GASES_FROM_CLUSTERS = OPTIX_CLUSTER_ACCEL_BUILD_TYPE_GASES_FROM_CLUSTERS
+    CLUSTERS_FROM_TRIANGLES = OPTIX_CLUSTER_ACCEL_BUILD_TYPE_CLUSTERS_FROM_TRIANGLES
+    TEMPLATES_FROM_TRIANGLES = OPTIX_CLUSTER_ACCEL_BUILD_TYPE_TEMPLATES_FROM_TRIANGLES
+    CLUSTERS_FROM_TEMPLATES = OPTIX_CLUSTER_ACCEL_BUILD_TYPE_CLUSTERS_FROM_TEMPLATES
+    TEMPLATES_FROM_GRIDS = OPTIX_CLUSTER_ACCEL_BUILD_TYPE_TEMPLATES_FROM_GRIDS
+
+
+cdef class ClusterAccelBuildInputTriangles(OptixObject):
+    def __cinit__(self):
+        memset(&self.build_input, 0, sizeof(self.build_input))
+
+    def __init__(self,
+                 flags=ClusterAccelBuildFlags.NONE,
+                 unsigned int max_arg_count=0,
+                 vertex_format=VertexFormat.FLOAT3,
+                 unsigned int max_sbt_index_value=0,
+                 unsigned int max_unique_sbt_index_count_per_arg=0,
+                 unsigned int max_triangle_count_per_arg=0,
+                 unsigned int max_vertex_count_per_arg=0,
+                 unsigned int max_total_triangle_count=0,
+                 unsigned int max_total_vertex_count=0,
+                 unsigned int min_position_truncate_bit_count=0):
+        self.build_input.flags = flags.value
+        self.build_input.maxArgCount = max_arg_count
+        self.build_input.vertexFormat = vertex_format.value
+        self.build_input.maxSbtIndexValue = max_sbt_index_value
+        self.build_input.maxUniqueSbtIndexCountPerArg = max_unique_sbt_index_count_per_arg
+        self.build_input.maxTriangleCountPerArg = max_triangle_count_per_arg
+        self.build_input.maxVertexCountPerArg = max_vertex_count_per_arg
+        self.build_input.maxTotalTriangleCount = max_total_triangle_count
+        self.build_input.maxTotalVertexCount = max_total_vertex_count
+        self.build_input.minPositionTruncateBitCount = min_position_truncate_bit_count
+
+    @property
+    def flags(self):
+        return ClusterAccelBuildFlags(self.build_input.flags)
+
+    @flags.setter
+    def flags(self, flags):
+        self.build_input.flags = flags.value
+
+    @property
+    def max_arg_count(self):
+        return self.build_input.maxArgCount
+
+    @max_arg_count.setter
+    def max_arg_count(self, unsigned int value):
+        self.build_input.maxArgCount = value
+
+    @property
+    def vertex_format(self):
+        return VertexFormat(self.build_input.vertexFormat)
+
+    @vertex_format.setter
+    def vertex_format(self, fmt):
+        self.build_input.vertexFormat = fmt.value
+
+    @property
+    def max_sbt_index_value(self):
+        return self.build_input.maxSbtIndexValue
+
+    @max_sbt_index_value.setter
+    def max_sbt_index_value(self, unsigned int value):
+        self.build_input.maxSbtIndexValue = value
+
+    @property
+    def max_triangle_count_per_arg(self):
+        return self.build_input.maxTriangleCountPerArg
+
+    @max_triangle_count_per_arg.setter
+    def max_triangle_count_per_arg(self, unsigned int value):
+        self.build_input.maxTriangleCountPerArg = value
+
+    @property
+    def max_vertex_count_per_arg(self):
+        return self.build_input.maxVertexCountPerArg
+
+    @max_vertex_count_per_arg.setter
+    def max_vertex_count_per_arg(self, unsigned int value):
+        self.build_input.maxVertexCountPerArg = value
+
+    @property
+    def max_total_triangle_count(self):
+        return self.build_input.maxTotalTriangleCount
+
+    @max_total_triangle_count.setter
+    def max_total_triangle_count(self, unsigned int value):
+        self.build_input.maxTotalTriangleCount = value
+
+    @property
+    def max_total_vertex_count(self):
+        return self.build_input.maxTotalVertexCount
+
+    @max_total_vertex_count.setter
+    def max_total_vertex_count(self, unsigned int value):
+        self.build_input.maxTotalVertexCount = value
+
+    @property
+    def min_position_truncate_bit_count(self):
+        return self.build_input.minPositionTruncateBitCount
+
+    @min_position_truncate_bit_count.setter
+    def min_position_truncate_bit_count(self, unsigned int value):
+        self.build_input.minPositionTruncateBitCount = value
+
+    @property
+    def max_unique_sbt_index_count_per_arg(self):
+        return self.build_input.maxUniqueSbtIndexCountPerArg
+
+    @max_unique_sbt_index_count_per_arg.setter
+    def max_unique_sbt_index_count_per_arg(self, unsigned int value):
+        self.build_input.maxUniqueSbtIndexCountPerArg = value
+
+
+cdef class ClusterAccelBuildInputGrids(OptixObject):
+    def __cinit__(self):
+        memset(&self.build_input, 0, sizeof(self.build_input))
+
+    def __init__(self,
+                 flags=ClusterAccelBuildFlags.NONE,
+                 unsigned int max_arg_count=0,
+                 vertex_format=VertexFormat.FLOAT3,
+                 unsigned int max_sbt_index_value=0,
+                 unsigned int max_width=0,
+                 unsigned int max_height=0):
+        self.build_input.flags = flags.value
+        self.build_input.maxArgCount = max_arg_count
+        self.build_input.vertexFormat = vertex_format.value
+        self.build_input.maxSbtIndexValue = max_sbt_index_value
+        self.build_input.maxWidth = max_width
+        self.build_input.maxHeight = max_height
+
+    @property
+    def flags(self):
+        return ClusterAccelBuildFlags(self.build_input.flags)
+
+    @flags.setter
+    def flags(self, flags):
+        self.build_input.flags = flags.value
+
+    @property
+    def max_arg_count(self):
+        return self.build_input.maxArgCount
+
+    @max_arg_count.setter
+    def max_arg_count(self, unsigned int value):
+        self.build_input.maxArgCount = value
+
+    @property
+    def vertex_format(self):
+        return VertexFormat(self.build_input.vertexFormat)
+
+    @vertex_format.setter
+    def vertex_format(self, fmt):
+        self.build_input.vertexFormat = fmt.value
+
+    @property
+    def max_sbt_index_value(self):
+        return self.build_input.maxSbtIndexValue
+
+    @max_sbt_index_value.setter
+    def max_sbt_index_value(self, unsigned int value):
+        self.build_input.maxSbtIndexValue = value
+
+    @property
+    def max_width(self):
+        return self.build_input.maxWidth
+
+    @max_width.setter
+    def max_width(self, unsigned int value):
+        self.build_input.maxWidth = value
+
+    @property
+    def max_height(self):
+        return self.build_input.maxHeight
+
+    @max_height.setter
+    def max_height(self, unsigned int value):
+        self.build_input.maxHeight = value
+
+
+cdef class ClusterAccelBuildInputClusters(OptixObject):
+    def __cinit__(self):
+        memset(&self.build_input, 0, sizeof(self.build_input))
+
+    def __init__(self,
+                 flags=ClusterAccelBuildFlags.NONE,
+                 unsigned int max_arg_count=0,
+                 unsigned int max_total_cluster_count=0,
+                 unsigned int max_cluster_count_per_arg=0):
+        self.build_input.flags = flags.value
+        self.build_input.maxArgCount = max_arg_count
+        self.build_input.maxTotalClusterCount = max_total_cluster_count
+        self.build_input.maxClusterCountPerArg = max_cluster_count_per_arg
+
+    @property
+    def flags(self):
+        return ClusterAccelBuildFlags(self.build_input.flags)
+
+    @flags.setter
+    def flags(self, flags):
+        self.build_input.flags = flags.value
+
+    @property
+    def max_arg_count(self):
+        return self.build_input.maxArgCount
+
+    @max_arg_count.setter
+    def max_arg_count(self, unsigned int value):
+        self.build_input.maxArgCount = value
+
+    @property
+    def max_total_cluster_count(self):
+        return self.build_input.maxTotalClusterCount
+
+    @max_total_cluster_count.setter
+    def max_total_cluster_count(self, unsigned int value):
+        self.build_input.maxTotalClusterCount = value
+
+    @property
+    def max_cluster_count_per_arg(self):
+        return self.build_input.maxClusterCountPerArg
+
+    @max_cluster_count_per_arg.setter
+    def max_cluster_count_per_arg(self, unsigned int value):
+        self.build_input.maxClusterCountPerArg = value
+
+
+cdef class ClusterAcceleration(OptixContextObject):
+    def __cinit__(self):
+        memset(&self._buffer_sizes, 0, sizeof(self._buffer_sizes))
+
+    def __init__(self, DeviceContext context):
+        super().__init__(context)
+
+    def compute_memory_usage(self, build_mode, build_input):
+        cdef OptixClusterAccelBuildInput c_build_input
+        memset(&c_build_input, 0, sizeof(c_build_input))
+
+        if isinstance(build_input, ClusterAccelBuildInputTriangles):
+            c_build_input.type = OPTIX_CLUSTER_ACCEL_BUILD_TYPE_CLUSTERS_FROM_TRIANGLES
+            c_build_input.triangles = (<ClusterAccelBuildInputTriangles>build_input).build_input
+        elif isinstance(build_input, ClusterAccelBuildInputGrids):
+            c_build_input.type = OPTIX_CLUSTER_ACCEL_BUILD_TYPE_TEMPLATES_FROM_GRIDS
+            c_build_input.grids = (<ClusterAccelBuildInputGrids>build_input).build_input
+        elif isinstance(build_input, ClusterAccelBuildInputClusters):
+            c_build_input.type = OPTIX_CLUSTER_ACCEL_BUILD_TYPE_GASES_FROM_CLUSTERS
+            c_build_input.clusters = (<ClusterAccelBuildInputClusters>build_input).build_input
+        else:
+            raise TypeError(f"Unsupported build input type: {type(build_input)}")
+
+        cdef OptixClusterAccelBuildMode c_build_mode = <OptixClusterAccelBuildMode>build_mode.value
+
+        optix_check_return(optixClusterAccelComputeMemoryUsage(
+            self.context.c_context,
+            c_build_mode,
+            &c_build_input,
+            &self._buffer_sizes))
+
+        return {
+            'output_size': self._buffer_sizes.outputSizeInBytes,
+            'temp_size': self._buffer_sizes.tempSizeInBytes,
+            'temp_update_size': self._buffer_sizes.tempUpdateSizeInBytes,
+        }
+
+    def build(self, build_input, args_array, unsigned int args_count,
+              unsigned int args_stride, build_mode=ClusterAccelBuildMode.IMPLICIT_DESTINATIONS,
+              output_buffer=None, temp_buffer=None, stream=None):
+        cdef OptixClusterAccelBuildInput c_build_input
+        memset(&c_build_input, 0, sizeof(c_build_input))
+
+        if isinstance(build_input, ClusterAccelBuildInputTriangles):
+            c_build_input.type = OPTIX_CLUSTER_ACCEL_BUILD_TYPE_CLUSTERS_FROM_TRIANGLES
+            c_build_input.triangles = (<ClusterAccelBuildInputTriangles>build_input).build_input
+        elif isinstance(build_input, ClusterAccelBuildInputGrids):
+            c_build_input.type = OPTIX_CLUSTER_ACCEL_BUILD_TYPE_TEMPLATES_FROM_GRIDS
+            c_build_input.grids = (<ClusterAccelBuildInputGrids>build_input).build_input
+        elif isinstance(build_input, ClusterAccelBuildInputClusters):
+            c_build_input.type = OPTIX_CLUSTER_ACCEL_BUILD_TYPE_GASES_FROM_CLUSTERS
+            c_build_input.clusters = (<ClusterAccelBuildInputClusters>build_input).build_input
+        else:
+            raise TypeError(f"Unsupported build input type: {type(build_input)}")
+
+        sizes = self.compute_memory_usage(build_mode, build_input)
+
+        if output_buffer is None:
+            output_buffer = cp.cuda.alloc(sizes['output_size'])
+        if temp_buffer is None:
+            temp_buffer = cp.cuda.alloc(sizes['temp_size'])
+
+        cdef OptixClusterAccelBuildModeDesc mode_desc
+        memset(&mode_desc, 0, sizeof(mode_desc))
+        mode_desc.mode = <OptixClusterAccelBuildMode>build_mode.value
+
+        if build_mode == ClusterAccelBuildMode.IMPLICIT_DESTINATIONS:
+            mode_desc.implicitDest.outputBuffer = output_buffer.ptr
+            mode_desc.implicitDest.outputBufferSizeInBytes = sizes['output_size']
+            mode_desc.implicitDest.tempBuffer = temp_buffer.ptr
+            mode_desc.implicitDest.tempBufferSizeInBytes = sizes['temp_size']
+        elif build_mode == ClusterAccelBuildMode.GET_SIZES:
+            mode_desc.getSize.tempBuffer = temp_buffer.ptr
+            mode_desc.getSize.tempBufferSizeInBytes = sizes['temp_size']
+
+        cdef uintptr_t c_stream = 0
+        if stream is not None:
+            c_stream = stream.ptr
+
+        optix_check_return(optixClusterAccelBuild(
+            self.context.c_context,
+            <CUstream>c_stream,
+            &mode_desc,
+            &c_build_input,
+            <CUdeviceptr>args_array.ptr,
+            <CUdeviceptr>args_count,
+            args_stride))
+
+        return output_buffer
 

@@ -1,7 +1,9 @@
 # distutils: language = c++
 
 from .common cimport optix_check_return, optix_init
+from libc.string cimport memset
 from libc.stdint cimport uintptr_t, int32_t
+cimport cython
 import cupy as cp
 
 __all__ = ['optix_version', 'DeviceContext']
@@ -29,6 +31,8 @@ cdef void context_log_cb(unsigned int level, const char * tag, const char * mess
 cdef size_t MAXIMUM_LAUNCH_SIZE = 2**30
 
 
+# no_gc_clear: the log callback must stay alive until optixDeviceContextDestroy in __dealloc__
+@cython.no_gc_clear
 cdef class DeviceContext(OptixObject):
     """
     Represents an OptiX context on a single device. This class wraps the OptixDeviceContext struct.
@@ -42,7 +46,7 @@ cdef class DeviceContext(OptixObject):
         Function to call for logging. If None logging will be disabled
     log_callback_level: int
         The log callback level. Please refer to the Logger Class for an explanation of the levels or consult the OptiX
-        documentation at https://raytracing-docs.nvidia.com/optix7/api/html/group__optix__types.html#gafa74ebb0b1ab57289a4d5a080cd4c090
+        documentation at https://raytracing-docs.nvidia.com/optix9/api/html/group__optix__types.html#gafa74ebb0b1ab57289a4d5a080cd4c090
     validation_mode: bool
         Enable or disable validation mode
     """
@@ -52,6 +56,7 @@ cdef class DeviceContext(OptixObject):
                  int32_t log_callback_level=1,
                  bint validation_mode=False):
         cdef OptixDeviceContextOptions options
+        memset(&options, 0, sizeof(options))
         if device is None:
             device = cp.cuda.Device(0) # use the default (0) device
 
@@ -235,6 +240,63 @@ cdef class DeviceContext(OptixObject):
         return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_SBT_OFFSET)
 
     @property
+    def shader_execution_reordering(self):
+        return self._get_property(OPTIX_DEVICE_PROPERTY_SHADER_EXECUTION_REORDERING)
+
+    @property
+    def coop_vec(self):
+        return self._get_property(OPTIX_DEVICE_PROPERTY_COOP_VEC)
+
+    @property
+    def cluster_accel(self):
+        return self._get_property(OPTIX_DEVICE_PROPERTY_CLUSTER_ACCEL)
+
+    @property
+    def max_cluster_vertices(self):
+        return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_CLUSTER_VERTICES)
+
+    @property
+    def max_cluster_triangles(self):
+        return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_CLUSTER_TRIANGLES)
+
+    @property
+    def max_structured_grid_resolution(self):
+        return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_STRUCTURED_GRID_RESOLUTION)
+
+    @property
+    def max_cluster_sbt_index(self):
+        """
+        The maximum sbt index allowed in a cluster acceleration structure (CLAS) build
+        """
+        return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_CLUSTER_SBT_INDEX)
+
+    @property
+    def max_clusters_per_gas(self):
+        """
+        The maximum number of clusters (CLAS) as input to a single GAS
+        """
+        return self._get_property(OPTIX_DEVICE_PROPERTY_LIMIT_MAX_CLUSTERS_PER_GAS)
+
+    def cancel_creations(self, bint block=False):
+        """
+        Cancel the task-based creation of all modules associated with this context.
+
+        Parameters
+        ----------
+        block: bool, optional
+            If True, block until the cancellation is effective.
+
+        Notes
+        -----
+        With driver 595.71.05, optixDeviceContextCancelCreations segfaults once the context has
+        actually compiled a module (OptiX disk cache miss). This is reproducible in plain C++,
+        prefer Module.cancel_creation for individual modules.
+        """
+        cdef OptixCreationFlags flags = OPTIX_CREATION_FLAG_BLOCK_UNTIL_EFFECTIVE if block else OPTIX_CREATION_FLAG_NONE
+        with nogil:
+            optix_check_return(optixDeviceContextCancelCreations(self.c_context, flags))
+
+    @property
     def device(self):
         """
         The device of this context
@@ -253,6 +315,9 @@ cdef class DeviceContext(OptixObject):
         return f"device id {self._device.id}"
 
 
+# no_gc_clear: keep the context alive until the dependent OptiX object is destroyed in __dealloc__,
+# otherwise the GC may destroy the context first when both are part of a reference cycle
+@cython.no_gc_clear
 cdef class OptixContextObject(OptixObject):
     """
     Base class for all optix Classes depending on an active context

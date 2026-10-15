@@ -26,7 +26,31 @@ cdef extern from "optix_includes.h" nogil:
         OPTIX_DEVICE_PROPERTY_LIMIT_MAX_INSTANCE_ID,
         OPTIX_DEVICE_PROPERTY_LIMIT_NUM_BITS_INSTANCE_VISIBILITY_MASK,
         OPTIX_DEVICE_PROPERTY_LIMIT_MAX_SBT_RECORDS_PER_GAS,
-        OPTIX_DEVICE_PROPERTY_LIMIT_MAX_SBT_OFFSET
+        OPTIX_DEVICE_PROPERTY_LIMIT_MAX_SBT_OFFSET,
+        OPTIX_DEVICE_PROPERTY_SHADER_EXECUTION_REORDERING,
+        OPTIX_DEVICE_PROPERTY_COOP_VEC,
+        OPTIX_DEVICE_PROPERTY_CLUSTER_ACCEL,
+        OPTIX_DEVICE_PROPERTY_LIMIT_MAX_CLUSTER_VERTICES,
+        OPTIX_DEVICE_PROPERTY_LIMIT_MAX_CLUSTER_TRIANGLES,
+        OPTIX_DEVICE_PROPERTY_LIMIT_MAX_STRUCTURED_GRID_RESOLUTION,
+        OPTIX_DEVICE_PROPERTY_LIMIT_MAX_CLUSTER_SBT_INDEX,
+        OPTIX_DEVICE_PROPERTY_LIMIT_MAX_CLUSTERS_PER_GAS,
+
+    cdef enum OptixDevicePropertyShaderExecutionReorderingFlags:
+        OPTIX_DEVICE_PROPERTY_SHADER_EXECUTION_REORDERING_FLAG_NONE,
+        OPTIX_DEVICE_PROPERTY_SHADER_EXECUTION_REORDERING_FLAG_STANDARD
+
+    cdef enum OptixDevicePropertyClusterAccelFlags:
+        OPTIX_DEVICE_PROPERTY_CLUSTER_ACCEL_FLAG_NONE,
+        OPTIX_DEVICE_PROPERTY_CLUSTER_ACCEL_FLAG_STANDARD
+
+    cdef enum OptixDevicePropertyCoopVecFlags:
+        OPTIX_DEVICE_PROPERTY_COOP_VEC_FLAG_NONE,
+        OPTIX_DEVICE_PROPERTY_COOP_VEC_FLAG_STANDARD
+
+    cdef enum OptixCreationFlags:
+        OPTIX_CREATION_FLAG_NONE,
+        OPTIX_CREATION_FLAG_BLOCK_UNTIL_EFFECTIVE
 
     cdef OptixResult optixDeviceContextCreate(CUcontext fromContext, const OptixDeviceContextOptions *options,
                                               OptixDeviceContext *context)
@@ -43,6 +67,7 @@ cdef extern from "optix_includes.h" nogil:
     cdef OptixResult optixDeviceContextSetCacheLocation(OptixDeviceContext context, const char *location)
     cdef OptixResult optixDeviceContextSetLogCallback(OptixDeviceContext context, OptixLogCallback callbackFunction,
                                                       void *callbackData, unsigned int callbackLevel)
+    cdef OptixResult optixDeviceContextCancelCreations(OptixDeviceContext context, OptixCreationFlags flags)
 
 cdef class _LogWrapper:
     cdef object log_function

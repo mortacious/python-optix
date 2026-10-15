@@ -13,7 +13,7 @@ class Logger(object):
       3     |  WARN
       4     |  DEBUG
 
-    See also https://raytracing-docs.nvidia.com/optix7/api/html/group__optix__types.html#gafa74ebb0b1ab57289a4d5a080cd4c090
+    See also https://raytracing-docs.nvidia.com/optix9/api/html/group__optix__types.html#gafa74ebb0b1ab57289a4d5a080cd4c090
     for more information.
 
     Parameters

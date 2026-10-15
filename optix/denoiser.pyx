@@ -3,6 +3,7 @@ import enum
 
 from .common cimport optix_check_return, optix_init
 from .context cimport DeviceContext
+from libc.string cimport memset
 import cupy as cp
 import numpy as np
 from enum import IntEnum
@@ -35,7 +36,7 @@ class DenoiserModelKind(IntEnum):
     """
     Wraps the OptixDenoiserModelKind enum.
     """
-    LHR = OPTIX_DENOISER_MODEL_KIND_LDR
+    LDR = OPTIX_DENOISER_MODEL_KIND_LDR
     HDR = OPTIX_DENOISER_MODEL_KIND_HDR
     AOV = OPTIX_DENOISER_MODEL_KIND_AOV
     TEMPORAL = OPTIX_DENOISER_MODEL_KIND_TEMPORAL
@@ -58,6 +59,8 @@ class PixelFormat(IntEnum):
     FLOAT2 = OPTIX_PIXEL_FORMAT_FLOAT2
     FLOAT3 = OPTIX_PIXEL_FORMAT_FLOAT3
     FLOAT4 = OPTIX_PIXEL_FORMAT_FLOAT4
+    UCHAR3 = OPTIX_PIXEL_FORMAT_UCHAR3
+    UCHAR4 = OPTIX_PIXEL_FORMAT_UCHAR4
 
     @classmethod
     def from_dtype_size(cls, dtype, size):
@@ -84,6 +87,9 @@ _dtype_to_pixeltype = {
 _pixeltype_to_dtype = {v: k for k,v in _dtype_to_pixeltype.items()}
 
 cdef class Image2D(OptixObject):
+    def __cinit__(self):
+        memset(&self.image, 0, sizeof(self.image))
+
     def __init__(self, data, require_type=None):
 
         if len(data.shape) != 3:
@@ -150,7 +156,7 @@ cdef class Image2D(OptixObject):
 cdef class Denoiser(OptixContextObject):
     def __init__(self,
                  DeviceContext context,
-                 model_kind=DenoiserModelKind.LHR,
+                 model_kind=DenoiserModelKind.LDR,
                  guide_albedo=False,
                  guide_normals=False,
                  denoise_alpha: DenoiserAlphaMode = DenoiserAlphaMode.COPY,
@@ -158,6 +164,7 @@ cdef class Denoiser(OptixContextObject):
                  tile_size=None):
         super().__init__(context)
         cdef OptixDenoiserOptions options
+        memset(&options, 0, sizeof(options))
         self.guide_albedo = guide_albedo
         self.guide_normals = guide_normals
         self.kp_mode = kp_mode
@@ -182,6 +189,7 @@ cdef class Denoiser(OptixContextObject):
 
     def _init_denoiser(self, num_inputs, input_size, stream=None):
         cdef OptixDenoiserSizes return_sizes
+        memset(&return_sizes, 0, sizeof(return_sizes))
 
         #input_size = <DenoiserLayer>(inputs[0]).input.shape[:2]
 
@@ -250,9 +258,15 @@ cdef class Denoiser(OptixContextObject):
                aov_types: typ.Optional[typ.Union[typ.Sequence[DenoiserAOVType], DenoiserAOVType]] = None,
                blend_factor: float = 0.0,
                stream: typ.Optional[cp.cuda.Stream] = None,
-               temporal_use_previous_layer: bool = False):
+               temporal_use_previous_layer: bool = False,
+               flow_mul: typ.Optional[typ.Tuple[float, float]] = None):
+        """
+        flow_mul: tuple(float, float), optional
+            Multiplication factors (x, y) applied to the motion vectors of the flow guide layer.
+            If None or zero, the motion vectors are not scaled.
+        """
 
-        accepted_input_types = (PixelFormat.FLOAT3, PixelFormat.FLOAT3, PixelFormat.HALF3, PixelFormat.HALF4)
+        accepted_input_types = (PixelFormat.FLOAT3, PixelFormat.FLOAT4, PixelFormat.HALF3, PixelFormat.HALF4)
         inputs = [Image2D(inp, require_type=accepted_input_types) for inp in ensure_iterable(inputs)]
 
         input_size = inputs[0].shape[:2]
@@ -269,15 +283,18 @@ cdef class Denoiser(OptixContextObject):
 
 
         cdef OptixDenoiserGuideLayer guide_layer
-        guide_layer.albedo = (<Image2D>albedo).image
-        guide_layer.normal = (<Image2D>normals).image
+        memset(&guide_layer, 0, sizeof(guide_layer))
+        if albedo is not None:
+            guide_layer.albedo = (<Image2D>albedo).image
+        if normals is not None:
+            guide_layer.normal = (<Image2D>normals).image
 
         temporal_mode = self.model_kind.temporal_mode()
         if temporal_mode:
             if flow is None:
                 raise ValueError("Flow is expected for temporal mode.")
             flow = Image2D(flow, require_type=(PixelFormat.HALF2, PixelFormat.FLOAT2))
-            guide_layer.flow = <Image2D>flow.image
+            guide_layer.flow = (<Image2D>flow).image
 
             if prev_outputs is None:
                 raise ValueError("Previous outputs are expected for temporal mode. For the first frame use a list of None values.")
@@ -289,7 +306,7 @@ cdef class Denoiser(OptixContextObject):
 
             if flow_trustworthiness is not None:
                 flow_trustworthiness = Image2D(flow_trustworthiness, require_type=(PixelFormat.HALF1, PixelFormat.FLOAT1))
-                guide_layer.flowTrustworthiness = <Image2D>flow_trustworthiness.image
+                guide_layer.flowTrustworthiness = (<Image2D>flow_trustworthiness).image
 
         # prepare the outputs
         if outputs is not None:
@@ -325,10 +342,13 @@ cdef class Denoiser(OptixContextObject):
         self._init_denoiser(len(inputs), input_size, stream=stream)
 
         cdef OptixDenoiserParams params
+        memset(&params, 0, sizeof(params))
         params.hdrIntensity = <CUdeviceptr>self._d_intensity.ptr if self._d_intensity is not None else 0
         params.hdrAverageColor = <CUdeviceptr>self._d_avg_color.ptr if self._d_avg_color is not None else 0
         params.blendFactor = blend_factor
         params.temporalModeUsePreviousLayers = 1 if temporal_use_previous_layer and temporal_mode else 0
+        if flow_mul is not None:
+            params.flowMulX, params.flowMulY = flow_mul
 
         cdef uintptr_t c_stream = 0
 
@@ -351,7 +371,7 @@ cdef class Denoiser(OptixContextObject):
                 self.denoiser,
                 <CUstream>c_stream,
                 &layers[0].input,
-                self._d_avg_color,
+                self._d_avg_color.ptr,
                 self._d_scratch.ptr,
                 self._average_color_scratch_size))
 
